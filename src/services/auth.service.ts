@@ -9,7 +9,7 @@ import {
   initFirebase,
   getFirebaseAuth,
   getFirestoreDb,
-  waitForFirestoreReady,
+  ensureFirestoreOnline,
 } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toBool, toString } from "@/lib/firestore-helpers";
@@ -42,14 +42,40 @@ export function bypassLogin(): User {
   return user;
 }
 
+function isFirestoreOfflineError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as { code?: string }).code ?? "";
+  return (
+    code === "unavailable" ||
+    err.message.includes("client is offline") ||
+    err.message.includes("Could not reach Cloud Firestore backend")
+  );
+}
+
+async function firestoreGetDoc(ref: ReturnType<typeof doc>) {
+  await ensureFirestoreOnline();
+  const firestore = getFirestoreDb();
+  if (!firestore) throw new Error("Firestore not initialized");
+  return getDoc(ref);
+}
+
+async function firestoreSetDoc(
+  ref: ReturnType<typeof doc>,
+  data: Record<string, unknown>,
+  options?: { merge?: boolean }
+) {
+  await ensureFirestoreOnline();
+  if (options?.merge) await setDoc(ref, data, { merge: true });
+  else await setDoc(ref, data);
+}
+
 async function ensureAdminProfile(uid: string, email: string) {
-  await waitForFirestoreReady();
   const firestore = getFirestoreDb();
   if (!firestore) throw new Error("Firestore not initialized");
   const ref = doc(firestore, "users", uid);
-  const snap = await getDoc(ref);
+  const snap = await firestoreGetDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, {
+    await firestoreSetDoc(ref, {
       name: "Admin",
       email,
       role: "admin",
@@ -60,7 +86,7 @@ async function ensureAdminProfile(uid: string, email: string) {
   }
   const data = snap.data();
   if (data.role !== "admin") {
-    await setDoc(ref, { role: "admin", active: true }, { merge: true });
+    await firestoreSetDoc(ref, { role: "admin", active: true }, { merge: true });
   }
 }
 
@@ -106,16 +132,6 @@ function firebaseAuthErrorMessage(code: string): string {
     default:
       return "Login failed (" + code + "). Check Firebase Console settings.";
   }
-}
-
-function isFirestoreOfflineError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  const code = (err as { code?: string }).code ?? "";
-  return (
-    code === "unavailable" ||
-    err.message.includes("client is offline") ||
-    err.message.includes("Could not reach Cloud Firestore backend")
-  );
 }
 
 export async function login(email: string, password: string): Promise<User> {
@@ -173,7 +189,7 @@ export async function login(email: string, password: string): Promise<User> {
       throw profileErr;
     }
 
-    const userDoc = await getDoc(doc(firestore, "users", cred.user.uid));
+    const userDoc = await firestoreGetDoc(doc(firestore, "users", cred.user.uid));
     if (!userDoc.exists()) throw new Error("Failed to create admin profile in Firestore");
     const data = userDoc.data();
     if (data.role !== "admin") {
@@ -228,7 +244,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
   try {
     await firebaseAuth.authStateReady();
-    await waitForFirestoreReady();
+    await ensureFirestoreOnline();
     const fbUser: FirebaseUser | null = firebaseAuth.currentUser;
 
     if (!fbUser) {
@@ -237,11 +253,11 @@ export async function getCurrentUser(): Promise<User | null> {
     }
 
     const userDocRef = doc(firestore, "users", fbUser.uid);
-    let userDoc = await getDoc(userDocRef);
+    let userDoc = await firestoreGetDoc(userDocRef);
 
     if (!userDoc.exists() && fbUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL) {
       await ensureAdminProfile(fbUser.uid, BOOTSTRAP_ADMIN_EMAIL);
-      userDoc = await getDoc(userDocRef);
+      userDoc = await firestoreGetDoc(userDocRef);
     }
 
     if (!userDoc.exists() || userDoc.data().role !== "admin") {

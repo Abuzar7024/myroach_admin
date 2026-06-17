@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toString, toBool } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
@@ -21,6 +21,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Category {
 
 async function fetchCategories(): Promise<Category[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs.map((d) => fromFirestore(d.id, d.data()));
@@ -35,6 +36,7 @@ export async function getCategory(id: string): Promise<Category | null> {
   if (USE_MOCK) return mockStore.categories.find((c) => c.id === id) ?? null;
   return safeGet(async () => {
     initFirebase();
+    const db = getFirestoreDb();
     if (!db) return null;
     const snap = await getDoc(doc(db, COL, id));
     if (!snap.exists()) return null;
@@ -49,6 +51,7 @@ export async function createCategory(data: Omit<Category, "id">): Promise<string
     return id;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   const ref = await addDoc(collection(db, COL), data);
   return ref.id;
@@ -61,6 +64,7 @@ export async function updateCategory(id: string, data: Partial<Category>): Promi
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await updateDoc(doc(db, COL, id), data);
 }
@@ -71,6 +75,7 @@ export async function deleteCategory(id: string): Promise<void> {
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await deleteDoc(doc(db, COL, id));
 }

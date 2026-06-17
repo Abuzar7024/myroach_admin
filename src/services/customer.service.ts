@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, getDoc, updateDoc } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toString, toBool } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
@@ -21,6 +21,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): User {
 
 async function fetchCustomers(): Promise<User[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs
@@ -37,6 +38,7 @@ export async function getCustomer(uid: string): Promise<User | null> {
   if (USE_MOCK) return mockStore.users.find((u) => u.uid === uid) ?? null;
   return safeGet(async () => {
     initFirebase();
+    const db = getFirestoreDb();
     if (!db) return null;
     const snap = await getDoc(doc(db, COL, uid));
     if (!snap.exists()) return null;
@@ -51,6 +53,7 @@ export async function updateCustomer(uid: string, data: Partial<User>): Promise<
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await updateDoc(doc(db, COL, uid), data);
 }

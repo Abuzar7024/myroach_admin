@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { USE_MOCK, STORE_URL, FIREBASE_CONFIGURED } from "@/lib/utils";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@gmail.com");
-  const [password, setPassword] = useState("admin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { setUser } = useAuth();
@@ -34,9 +34,13 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!email.trim() || !password) {
+      toast.error("Enter your email and password");
+      return;
+    }
     setLoading(true);
     try {
-      const user = await login(email, password);
+      const user = await login(email.trim(), password);
       setUser(user);
       toast.success("Welcome back!");
       router.replace("/dashboard");
@@ -63,7 +67,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-white">Sign in</CardTitle>
             <p className="text-sm text-zinc-400">
-              {USE_MOCK ? "Mock mode active" : "Synced with live Firebase store"}
+              {USE_MOCK ? "Mock mode active" : "Sign in with your Firebase admin account"}
             </p>
           </CardHeader>
           <CardContent>
@@ -74,10 +78,9 @@ export default function LoginPage() {
             )}
             {!USE_MOCK && FIREBASE_CONFIGURED && (
               <div className="mb-4 rounded-md border border-zinc-700 bg-zinc-800/50 p-3 text-xs text-zinc-400 space-y-1">
-                <p>Firebase project: <span className="text-zinc-300">myroach-6cc80</span></p>
-                <p>First login: <span className="text-zinc-300">admin@gmail.com</span> / <span className="text-zinc-300">admin@123</span> (auto-creates admin)</p>
-                <p>If you added the user in Firebase Console, use that exact password — or reset it there.</p>
-                <p>Deploy rules: <span className="text-zinc-300">firebase deploy --only firestore:rules</span></p>
+                <p>Use the email and password from Firebase Authentication.</p>
+                <p>Your account must have <span className="text-zinc-300">role: admin</span> in Firestore <span className="text-zinc-300">users/&#123;uid&#125;</span>.</p>
+                <p>If Firestore fails: disable App Check enforcement for dev, or deploy rules.</p>
               </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -89,8 +92,9 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  autoComplete="email"
-                  className="border-zinc-700 bg-zinc-800 text-white"
+                  autoComplete="username"
+                  placeholder="you@example.com"
+                  className="border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500"
                 />
               </div>
               <div className="space-y-2">
@@ -101,12 +105,10 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="border-zinc-700 bg-zinc-800 text-white"
+                  placeholder="Enter your password"
+                  className="border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500"
                 />
               </div>
-              {USE_MOCK && (
-                <p className="text-xs text-zinc-500">Mock: admin@gmail.com / admin@123</p>
-              )}
               <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200" disabled={loading}>
                 {loading ? "Signing in..." : "Sign in to Admin"}
               </Button>

@@ -1,5 +1,5 @@
 import { collection, getDocs } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { toDate, toString, toBool } from "@/lib/firestore-helpers";
 import { safeList } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
@@ -22,6 +22,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Subscriber {
 
 async function fetchSubscribers(): Promise<Subscriber[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   for (const col of COLS) {
     try {

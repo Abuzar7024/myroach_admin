@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { safeData } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
@@ -11,6 +11,7 @@ const HOMEPAGE_ID = "homepage";
 
 async function fetchSettings(): Promise<Settings> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return { ...mockStore.settings };
   const snap = await getDoc(doc(db, SETTINGS_DOC, SETTINGS_ID));
   return snap.exists() ? (snap.data() as Settings) : { ...mockStore.settings };
@@ -18,6 +19,7 @@ async function fetchSettings(): Promise<Settings> {
 
 async function fetchHomepage(): Promise<HomepageContent> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return { ...mockStore.homepage };
   const snap = await getDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID));
   return snap.exists() ? (snap.data() as HomepageContent) : { ...mockStore.homepage };
@@ -34,6 +36,7 @@ export async function updateSettings(data: Partial<Settings>): Promise<void> {
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await setDoc(doc(db, SETTINGS_DOC, SETTINGS_ID), data, { merge: true });
 }
@@ -49,6 +52,7 @@ export async function updateHomepageContent(data: Partial<HomepageContent>): Pro
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await setDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID), data, { merge: true });
 }

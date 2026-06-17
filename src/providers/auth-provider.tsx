@@ -54,13 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getCurrentUser()
       .then((u) => {
         if (!cancelled) {
-          setUser(u);
+          // Keep user from login() if Firestore is temporarily unreachable
+          setUser((current) => u ?? current);
           setLoading(false);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setUser(null);
           setLoading(false);
         }
       });

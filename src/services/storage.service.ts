@@ -1,6 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { getStorage } from "firebase/storage";
-import { initFirebase, app } from "@/lib/firebase";
+import { initFirebase, getFirebaseApp } from "@/lib/firebase";
 import { USE_MOCK } from "@/lib/config";
 
 export function buildStoragePath(base: string, file: File): string {
@@ -14,8 +14,9 @@ export async function uploadImage(path: string, file: File): Promise<string> {
     return URL.createObjectURL(file);
   }
   initFirebase();
-  if (!app) throw new Error("Firebase not initialized. Sign in with Firebase (not dev bypass) to upload.");
-  const storage = getStorage(app);
+  const firebaseApp = getFirebaseApp();
+  if (!firebaseApp) throw new Error("Firebase not initialized. Sign in with Firebase (not dev bypass) to upload.");
+  const storage = getStorage(firebaseApp);
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   return getDownloadURL(storageRef);
@@ -24,7 +25,8 @@ export async function uploadImage(path: string, file: File): Promise<string> {
 export async function deleteImage(path: string): Promise<void> {
   if (USE_MOCK) return;
   initFirebase();
-  if (!app) return;
-  const storage = getStorage(app);
+  const firebaseApp = getFirebaseApp();
+  if (!firebaseApp) return;
+  const storage = getStorage(firebaseApp);
   await deleteObject(ref(storage, path));
 }

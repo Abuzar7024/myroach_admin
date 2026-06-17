@@ -1,5 +1,5 @@
 import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { toDate, toNumber, toString, toBool } from "@/lib/firestore-helpers";
 import { safeList } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
@@ -28,6 +28,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Review {
 
 async function fetchReviews(): Promise<Review[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs
@@ -46,6 +47,7 @@ export async function approveReview(id: string, approved: boolean): Promise<void
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await updateDoc(doc(db, COL, id), { approved });
 }
@@ -56,6 +58,7 @@ export async function deleteReview(id: string): Promise<void> {
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await deleteDoc(doc(db, COL, id));
 }

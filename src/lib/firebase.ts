@@ -26,9 +26,10 @@ let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
 let appCheck: AppCheck | undefined;
 let appCheckReady: Promise<void> | undefined;
-let initialized = false;
 
 function initAppCheck(firebaseApp: FirebaseApp) {
+  if (appCheck) return;
+
   const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_DEBUG_TOKEN;
   const recaptchaKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_RECAPTCHA_KEY;
   const forceAppCheck = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED === "true";
@@ -62,8 +63,8 @@ function initAppCheck(firebaseApp: FirebaseApp) {
   }
 }
 
-/** Wait for App Check before Firestore reads/writes when enforcement is enabled. */
-export async function waitForFirestoreReady(): Promise<void> {
+/** Wait for App Check token when enabled. */
+export async function ensureFirestoreOnline(): Promise<void> {
   initFirebase();
   if (appCheckReady) await appCheckReady;
 }
@@ -82,15 +83,14 @@ export function initFirebase() {
     app = getApps()[0];
   }
 
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
+  if (!auth) auth = getAuth(app);
+  // Single getFirestore call — never mix with initializeFirestore (causes "Target ID already exists")
+  if (!db) db = getFirestore(app);
+  if (!storage) storage = getStorage(app);
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && auth) {
     setPersistence(auth, browserLocalPersistence).catch(() => {});
   }
-
-  initialized = true;
 }
 
 export function getFirebaseAuth(): Auth | undefined {
@@ -103,8 +103,10 @@ export function getFirestoreDb(): Firestore | undefined {
   return db;
 }
 
-if (typeof window !== "undefined" && !USE_MOCK) {
+export function getFirebaseApp(): FirebaseApp | undefined {
   initFirebase();
+  return app;
 }
 
-export { app, auth, db, storage };
+/** @deprecated Use ensureFirestoreOnline */
+export const waitForFirestoreReady = ensureFirestoreOnline;

@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toNumber, toString, toBool } from "@/lib/firestore-helpers";
 import { safeList } from "@/lib/safe-async";
@@ -23,6 +23,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Coupon {
 
 async function fetchCoupons(): Promise<Coupon[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs.map((d) => fromFirestore(d.id, d.data()));
@@ -40,6 +41,7 @@ export async function createCoupon(data: Omit<Coupon, "id">): Promise<string> {
     return id;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   const ref = await addDoc(collection(db, COL), {
     ...data,
@@ -55,6 +57,7 @@ export async function updateCoupon(id: string, data: Partial<Coupon>): Promise<v
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   const payload: Record<string, unknown> = { ...data };
   if (data.expiryDate) payload.expiryDate = Timestamp.fromDate(data.expiryDate);
@@ -67,6 +70,7 @@ export async function deleteCoupon(id: string): Promise<void> {
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await deleteDoc(doc(db, COL, id));
 }

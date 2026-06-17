@@ -1,5 +1,5 @@
 import { collection, doc, getDocs, getDoc, updateDoc, Timestamp } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toNumber, toString, toArray } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
@@ -40,6 +40,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Order {
 
 async function fetchOrders(): Promise<Order[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs
@@ -56,6 +57,7 @@ export async function getOrder(id: string): Promise<Order | null> {
   if (USE_MOCK) return mockStore.orders.find((o) => o.id === id) ?? null;
   return safeGet(async () => {
     initFirebase();
+    const db = getFirestoreDb();
     if (!db) return null;
     const snap = await getDoc(doc(db, COL, id));
     if (!snap.exists()) return null;
@@ -70,6 +72,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await updateDoc(doc(db, COL, id), { status, updatedAt: Timestamp.now() });
 }

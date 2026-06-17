@@ -8,7 +8,7 @@ import {
   deleteDoc,
   Timestamp,
 } from "firebase/firestore";
-import { db, initFirebase } from "@/lib/firebase";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import {
   toDate,
@@ -50,6 +50,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Product {
 
 async function fetchProducts(): Promise<Product[]> {
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) return [];
   const snap = await getDocs(collection(db, COL));
   return snap.docs
@@ -66,6 +67,7 @@ export async function getProduct(id: string): Promise<Product | null> {
   if (USE_MOCK) return mockStore.products.find((p) => p.id === id) ?? null;
   return safeGet(async () => {
     initFirebase();
+    const db = getFirestoreDb();
     if (!db) return null;
     const snap = await getDoc(doc(db, COL, id));
     if (!snap.exists()) return null;
@@ -80,6 +82,7 @@ export async function createProduct(data: Omit<Product, "id" | "createdAt" | "up
     return id;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   const ref = await addDoc(collection(db, COL), {
     ...data,
@@ -96,6 +99,7 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   const payload: Record<string, unknown> = { ...data, updatedAt: Timestamp.now() };
   delete payload.id;
@@ -109,6 +113,7 @@ export async function deleteProduct(id: string): Promise<void> {
     return;
   }
   initFirebase();
+  const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await deleteDoc(doc(db, COL, id));
 }
