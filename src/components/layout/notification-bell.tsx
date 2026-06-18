@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, ExternalLink, ShoppingCart, Mail, Star, Globe, Package } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, ShoppingCart, Mail, Star, Globe, Package, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAdminNotifications } from "@/providers/admin-notifications-provider";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ function iconFor(type: string) {
   switch (type) {
     case "order":
       return ShoppingCart;
+    case "customer":
+      return Users;
     case "subscriber":
       return Mail;
     case "review":

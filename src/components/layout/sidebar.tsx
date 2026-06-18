@@ -23,8 +23,9 @@ import {
   Mail,
   FileText,
   Activity,
+  RotateCcw,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn, STORE_URL, USE_MOCK } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useSync } from "@/providers/sync-provider";
@@ -53,6 +54,7 @@ const navGroups = [
     label: "Sales",
     items: [
       { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
+      { href: "/dashboard/order-requests", label: "Order Requests", icon: RotateCcw },
       { href: "/dashboard/customers", label: "Customers", icon: Users },
       { href: "/dashboard/coupons", label: "Coupons", icon: Ticket },
       { href: "/dashboard/reports", label: "Reports", icon: FileText },
@@ -79,8 +81,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { connected, counts } = useSync();
-  const { unreadByHref, unreadCount } = useAdminNotifications();
+  const { unreadByHref, unreadCount, markReadForPath } = useAdminNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    markReadForPath(pathname);
+  }, [pathname, markReadForPath]);
 
   function navBadge(href: string) {
     const count = unreadByHref[href] ?? 0;

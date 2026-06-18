@@ -24,11 +24,20 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    // Users: owner manages own profile; admins manage all (required for admin panel + isAdmin())
+    function isBootstrapAdminEmail() {
+      return request.auth.token.email == 'admin@gmail.com';
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && (
+        request.resource.data.role == 'customer'
+        || (request.resource.data.role == 'admin' && isBootstrapAdminEmail())
+      );
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && request.resource.data.role == resource.data.role
+      );
       allow delete: if isAdmin();
     }
 
@@ -44,8 +53,19 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin() || (
+      allow create: if isAuth()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if (
+        isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'paymentStatus',
+          'trackingNumber',
+          'updatedAt',
+          'statusHistory'
+        ])
+      ) || (
         isAuth()
         && resource.data.userId == request.auth.uid
         && resource.data.status in ['pending', 'confirmed']
@@ -60,10 +80,19 @@ service cloud.firestore {
       allow create: if isAuth()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.type in ['cancel', 'refund']
+        && request.resource.data.type in ['refund', 'exchange', 'cancel']
+        && request.resource.data.policyAccepted == true
         && request.resource.data.reason is string
         && request.resource.data.reason.size() >= 10
-        && request.resource.data.reason.size() <= 500;
+        && request.resource.data.reason.size() <= 500
+        && (
+          request.resource.data.type != 'exchange'
+          || (
+            request.resource.data.exchangeDetails is string
+            && request.resource.data.exchangeDetails.size() >= 3
+            && request.resource.data.exchangeDetails.size() <= 300
+          )
+        );
       allow update: if isAdmin();
       allow delete: if false;
     }

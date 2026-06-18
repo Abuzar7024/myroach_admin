@@ -10,17 +10,31 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   emitAdminNotification,
   subscribeAdminNotifications,
   type AdminNotification,
 } from "@/lib/admin-notifications";
+import { getFirebaseAuth, initFirebase } from "@/lib/firebase";
 import { getRealtimeDb, subscribeCollection } from "@/lib/realtime";
 import { USE_MOCK, STORE_URL } from "@/lib/config";
 import { toString, toNumber, toBool } from "@/lib/firestore-helpers";
+import { normalizeRequestType } from "@/lib/order-request";
 
 const STORAGE_KEY = "myroach-admin-notifications-read";
+const DEV_BYPASS_UID = "dev-bypass-admin";
 const MAX_NOTIFICATIONS = 40;
+
+function navKeyFromHref(href: string) {
+  if (href.startsWith("/dashboard/order-requests")) return "/dashboard/order-requests";
+  if (href.startsWith("/dashboard/orders")) return "/dashboard/orders";
+  if (href.startsWith("/dashboard/customers")) return "/dashboard/customers";
+  if (href.startsWith("/dashboard/products")) return "/dashboard/products";
+  if (href.startsWith("/dashboard/reviews")) return "/dashboard/reviews";
+  if (href.startsWith("/dashboard/subscribers")) return "/dashboard/subscribers";
+  return href;
+}
 
 interface AdminNotificationsContextValue {
   notifications: AdminNotification[];
@@ -28,6 +42,7 @@ interface AdminNotificationsContextValue {
   unreadByHref: Record<string, number>;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  markReadForPath: (pathname: string) => void;
   clearAll: () => void;
 }
 
@@ -37,6 +52,7 @@ const AdminNotificationsContext = createContext<AdminNotificationsContextValue>(
   unreadByHref: {},
   markRead: () => {},
   markAllRead: () => {},
+  markReadForPath: () => {},
   clearAll: () => {},
 });
 
@@ -72,6 +88,8 @@ function toastForNotification(n: AdminNotification) {
     toast.success(n.title, { description: n.message, duration: 8000, action });
   } else if (n.type === "order_request") {
     toast.message(n.title, { description: n.message, duration: 9000, action });
+  } else if (n.type === "customer") {
+    toast.message(n.title, { description: n.message, duration: 7000, action });
   } else if (n.type === "catalog" || n.type === "storefront") {
     toast.message(n.title, { description: n.message, duration: 7000, action });
   } else {
@@ -120,138 +138,225 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (USE_MOCK) return;
-    const db = getRealtimeDb();
-    if (!db) return;
 
-    const known = {
-      orders: new Set<string>(),
-      orderRequests: new Set<string>(),
-      subscribers: new Set<string>(),
-      reviews: new Set<string>(),
+    initFirebase();
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+
+    let unsubs: (() => void)[] = [];
+
+    const onPermError = (collectionName: string) => (err: Error) => {
+      console.error(`[notifications] ${collectionName}:`, err);
+      if (err.message.includes("permission")) {
+        toast.error(
+          "Live notifications blocked — sign in with Firebase admin (not dev bypass) and deploy Firestore rules.",
+          { id: "notif-perm" }
+        );
+      }
     };
-    const ready = { orders: false, orderRequests: false, subscribers: false, reviews: false };
 
-    const unsubs = [
-      subscribeCollection(db, "orders", (changes) => {
-        if (!ready.orders) {
-          changes.forEach((c) => known.orders.add(c.id));
-          ready.orders = true;
-          return;
-        }
-        changes
-          .filter((c) => c.type === "added" && !known.orders.has(c.id))
-          .forEach((c) => {
-            known.orders.add(c.id);
-            const total = toNumber(c.data.total);
-            const name = toString(c.data.customerName ?? c.data.name, "Customer");
-            pushNotification({
-              id: `order-${c.id}`,
-              type: "order",
-              title: "New order on the site",
-              message: `${name} placed an order — check details and fulfill it.`,
-              href: `/dashboard/orders/${c.id}`,
-              createdAt: Date.now(),
+    const unsubAuth = onAuthStateChanged(auth, (fbUser) => {
+      unsubs.forEach((u) => u());
+      unsubs = [];
+
+      if (!fbUser || fbUser.uid === DEV_BYPASS_UID) return;
+
+      const db = getRealtimeDb();
+      if (!db) return;
+
+      const known = {
+        orders: new Set<string>(),
+        orderRequests: new Set<string>(),
+        subscribers: new Set<string>(),
+        reviews: new Set<string>(),
+        customers: new Set<string>(),
+      };
+      const ready = {
+        orders: false,
+        orderRequests: false,
+        subscribers: false,
+        reviews: false,
+        customers: false,
+      };
+
+      unsubs = [
+        subscribeCollection(
+          db,
+          "orders",
+          (changes) => {
+            if (!ready.orders) {
+              changes.forEach((c) => known.orders.add(c.id));
+              ready.orders = true;
+              return;
+            }
+            changes
+              .filter((c) => c.type === "added" && !known.orders.has(c.id))
+              .forEach((c) => {
+                known.orders.add(c.id);
+                const name = toString(c.data.customerName ?? c.data.name, "Customer");
+                pushNotification({
+                  id: `order-${c.id}`,
+                  type: "order",
+                  title: "New order on the site",
+                  message: `${name} placed an order — open Orders to fulfill it.`,
+                  href: `/dashboard/orders/${c.id}`,
+                  createdAt: Date.now(),
+                });
+              });
+          },
+          onPermError("orders")
+        ),
+
+        subscribeCollection(
+          db,
+          "orderRequests",
+          (changes) => {
+            if (!ready.orderRequests) {
+              changes.forEach((c) => known.orderRequests.add(c.id));
+              ready.orderRequests = true;
+              return;
+            }
+            changes
+              .filter((c) => c.type === "added" && !known.orderRequests.has(c.id))
+              .forEach((c) => {
+                known.orderRequests.add(c.id);
+                const type = normalizeRequestType(c.data.type);
+                const name = toString(c.data.customerName, "Customer");
+                const title =
+                  type === "exchange"
+                    ? "New exchange request"
+                    : "New refund / cancellation request";
+                pushNotification({
+                  id: `oreq-${c.id}`,
+                  type: "order_request",
+                  title,
+                  message: `${name} submitted a ${type} request — review and approve in Order Requests.`,
+                  href: `/dashboard/order-requests`,
+                  createdAt: Date.now(),
+                });
+              });
+          },
+          onPermError("orderRequests")
+        ),
+
+        subscribeCollection(
+          db,
+          "subscribers",
+          (changes) => {
+            if (!ready.subscribers) {
+              changes.forEach((c) => known.subscribers.add(c.id));
+              ready.subscribers = true;
+              return;
+            }
+            changes
+              .filter((c) => c.type === "added" && !known.subscribers.has(c.id))
+              .forEach((c) => {
+                known.subscribers.add(c.id);
+                const email = toString(c.data.email);
+                pushNotification({
+                  id: `sub-${c.id}`,
+                  type: "subscriber",
+                  title: "New newsletter signup",
+                  message: email ? `${email} joined from the storefront.` : "Someone subscribed on the site.",
+                  href: "/dashboard/subscribers",
+                  createdAt: Date.now(),
+                });
+              });
+          },
+          onPermError("subscribers")
+        ),
+
+        subscribeCollection(
+          db,
+          "reviews",
+          (changes) => {
+            if (!ready.reviews) {
+              changes.forEach((c) => known.reviews.add(c.id));
+              ready.reviews = true;
+              return;
+            }
+            changes
+              .filter((c) => c.type === "added" && !known.reviews.has(c.id))
+              .forEach((c) => {
+                known.reviews.add(c.id);
+                const approved = toBool(c.data.approved ?? c.data.published, false);
+                if (approved) return;
+                const author = toString(c.data.author ?? c.data.userName, "Someone");
+                pushNotification({
+                  id: `rev-${c.id}`,
+                  type: "review",
+                  title: "New review to moderate",
+                  message: `${author} left a review — approve or hide it.`,
+                  href: "/dashboard/reviews",
+                  createdAt: Date.now(),
+                });
+              });
+          },
+          onPermError("reviews")
+        ),
+
+        subscribeCollection(
+          db,
+          "users",
+          (changes) => {
+            if (!ready.customers) {
+              changes.forEach((c) => known.customers.add(c.id));
+              ready.customers = true;
+              return;
+            }
+            changes
+              .filter((c) => c.type === "added" && !known.customers.has(c.id))
+              .forEach((c) => {
+                const role = toString(c.data.role, "customer");
+                if (role === "admin") return;
+                known.customers.add(c.id);
+                const name = toString(c.data.name ?? c.data.displayName, "New customer");
+                pushNotification({
+                  id: `cust-${c.id}`,
+                  type: "customer",
+                  title: "New customer signup",
+                  message: `${name} registered on the storefront.`,
+                  href: `/dashboard/customers/${c.id}`,
+                  createdAt: Date.now(),
+                });
+              });
+          },
+          onPermError("users")
+        ),
+      ];
+
+      const unsubNewsletter = subscribeCollection(
+        db,
+        "newsletter",
+        (changes) => {
+          changes
+            .filter((c) => c.type === "added" && !known.subscribers.has(`nl-${c.id}`))
+            .forEach((c) => {
+              if (!ready.subscribers) {
+                known.subscribers.add(`nl-${c.id}`);
+                return;
+              }
+              known.subscribers.add(`nl-${c.id}`);
+              const email = toString(c.data.email);
+              pushNotification({
+                id: `sub-nl-${c.id}`,
+                type: "subscriber",
+                title: "New newsletter signup",
+                message: email ? `${email} joined from the storefront.` : "New subscriber on the site.",
+                href: "/dashboard/subscribers",
+                createdAt: Date.now(),
+              });
             });
-          });
-      }),
-
-      subscribeCollection(db, "orderRequests", (changes) => {
-        if (!ready.orderRequests) {
-          changes.forEach((c) => known.orderRequests.add(c.id));
-          ready.orderRequests = true;
-          return;
-        }
-        changes
-          .filter((c) => c.type === "added" && !known.orderRequests.has(c.id))
-          .forEach((c) => {
-            known.orderRequests.add(c.id);
-            const type = toString(c.data.type, "cancel");
-            const name = toString(c.data.customerName, "Customer");
-            const orderId = toString(c.data.orderId);
-            pushNotification({
-              id: `oreq-${c.id}`,
-              type: "order_request",
-              title: type === "refund" ? "New refund request" : "New cancellation request",
-              message: `${name} submitted a ${type} request — review and reply.`,
-              href: `/dashboard/orders/${orderId}`,
-              createdAt: Date.now(),
-            });
-          });
-      }),
-
-      subscribeCollection(db, "subscribers", (changes) => {
-        if (!ready.subscribers) {
-          changes.forEach((c) => known.subscribers.add(c.id));
           ready.subscribers = true;
-          return;
-        }
-        changes
-          .filter((c) => c.type === "added" && !known.subscribers.has(c.id))
-          .forEach((c) => {
-            known.subscribers.add(c.id);
-            const email = toString(c.data.email);
-            pushNotification({
-              id: `sub-${c.id}`,
-              type: "subscriber",
-              title: "New newsletter signup",
-              message: email ? `${email} joined the rotation.` : "Someone subscribed on the storefront.",
-              href: "/dashboard/subscribers",
-              createdAt: Date.now(),
-            });
-          });
-      }),
-
-      subscribeCollection(db, "reviews", (changes) => {
-        if (!ready.reviews) {
-          changes.forEach((c) => known.reviews.add(c.id));
-          ready.reviews = true;
-          return;
-        }
-        changes
-          .filter((c) => c.type === "added" && !known.reviews.has(c.id))
-          .forEach((c) => {
-            known.reviews.add(c.id);
-            const approved = toBool(c.data.approved ?? c.data.published, false);
-            if (approved) return;
-            const author = toString(c.data.author ?? c.data.userName, "Someone");
-            pushNotification({
-              id: `rev-${c.id}`,
-              type: "review",
-              title: "New review to moderate",
-              message: `${author} left a review — approve or hide it.`,
-              href: "/dashboard/reviews",
-              createdAt: Date.now(),
-            });
-          });
-      }),
-    ];
-
-    // Newsletter collection fallback (storefront may use either name)
-    const unsubNewsletter = subscribeCollection(db, "newsletter", (changes) => {
-      changes
-        .filter((c) => c.type === "added" && !known.subscribers.has(`nl-${c.id}`))
-        .forEach((c) => {
-          if (!ready.subscribers) {
-            known.subscribers.add(`nl-${c.id}`);
-            return;
-          }
-          known.subscribers.add(`nl-${c.id}`);
-          const email = toString(c.data.email);
-          pushNotification({
-            id: `sub-nl-${c.id}`,
-            type: "subscriber",
-            title: "New newsletter signup",
-            message: email ? `${email} joined from the storefront.` : "New subscriber on the site.",
-            href: "/dashboard/subscribers",
-            createdAt: Date.now(),
-          });
-        });
-      ready.subscribers = true;
+        },
+        onPermError("newsletter")
+      );
+      unsubs.push(unsubNewsletter);
     });
 
     return () => {
+      unsubAuth();
       unsubs.forEach((u) => u());
-      unsubNewsletter();
     };
   }, [pushNotification]);
 
@@ -275,6 +380,22 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     });
   }, [readIds]);
 
+  const markReadForPath = useCallback((pathname: string) => {
+    setNotifications((prev) => {
+      const ids = prev
+        .filter((n) => !n.read && n.href && pathname.startsWith(navKeyFromHref(n.href)))
+        .map((n) => n.id);
+      if (!ids.length) return prev;
+      setReadIds((old) => {
+        const next = new Set(old);
+        ids.forEach((id) => next.add(id));
+        saveReadIds(next);
+        return next;
+      });
+      return prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n));
+    });
+  }, []);
+
   const clearAll = useCallback(() => {
     setNotifications([]);
   }, []);
@@ -288,15 +409,9 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
   const unreadByHref = useMemo(() => {
     const map: Record<string, number> = {};
-    const navKey = (href: string) => {
-      if (href.startsWith("/dashboard/orders")) return "/dashboard/orders";
-      if (href.startsWith("/dashboard/customers")) return "/dashboard/customers";
-      if (href.startsWith("/dashboard/products")) return "/dashboard/products";
-      return href;
-    };
     enriched.forEach((n) => {
       if (!n.read && n.href) {
-        const key = navKey(n.href);
+        const key = navKeyFromHref(n.href);
         map[key] = (map[key] ?? 0) + 1;
       }
     });
@@ -311,6 +426,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         unreadByHref,
         markRead,
         markAllRead,
+        markReadForPath,
         clearAll,
       }}
     >

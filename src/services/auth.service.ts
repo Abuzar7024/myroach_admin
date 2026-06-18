@@ -20,6 +20,9 @@ const SESSION_COOKIE = "admin_session";
 const BOOTSTRAP_ADMIN_EMAIL = "admin@gmail.com";
 const BOOTSTRAP_ADMIN_PASSWORD = "admin@123";
 const DEV_BYPASS_UID = "dev-bypass-admin";
+const BOOTSTRAP_ENABLED =
+  process.env.NODE_ENV === "development" &&
+  process.env.NEXT_PUBLIC_ENABLE_ADMIN_BOOTSTRAP === "true";
 
 function isFirestoreOfflineError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -85,7 +88,9 @@ function mapUserDoc(uid: string, data: Record<string, unknown>): User {
 }
 
 function setSessionCookie(uid: string) {
-  document.cookie = `${SESSION_COOKIE}=${uid}; path=/; max-age=604800; SameSite=Lax`;
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${SESSION_COOKIE}=${uid}; path=/; max-age=2592000; SameSite=Lax${secure}`;
 }
 
 function clearSessionCookie() {
@@ -139,7 +144,9 @@ export async function login(email: string, password: string): Promise<User> {
   }
 
   const isBootstrap =
-    normalizedEmail === BOOTSTRAP_ADMIN_EMAIL && password === BOOTSTRAP_ADMIN_PASSWORD;
+    BOOTSTRAP_ENABLED &&
+    normalizedEmail === BOOTSTRAP_ADMIN_EMAIL &&
+    password === BOOTSTRAP_ADMIN_PASSWORD;
 
   try {
     let cred;
@@ -239,7 +246,7 @@ export async function getCurrentUser(): Promise<User | null> {
     const userDocRef = doc(firestore, "users", fbUser.uid);
     let userDoc = await firestoreGetDoc(userDocRef);
 
-    if (!userDoc.exists() && fbUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL) {
+    if (!userDoc.exists() && BOOTSTRAP_ENABLED && fbUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL) {
       await ensureAdminProfile(fbUser.uid, BOOTSTRAP_ADMIN_EMAIL);
       userDoc = await firestoreGetDoc(userDocRef);
     }

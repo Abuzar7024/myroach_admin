@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import {
   getOrderResponseTemplate,
   renderOrderResponseMessage,
   requestTypeLabel,
+  requestStatusLabel,
   type OrderRequest,
   type OrderResponseTemplateKey,
 } from "@/lib/order-request";
@@ -23,13 +25,16 @@ import {
 interface OrderRequestPanelProps {
   orderId: string;
   orderTotal: number;
+  initialActiveRequestId?: string | null;
 }
 
 function templatesForRequest(type: OrderRequest["type"], decision: "approved" | "rejected") {
-  if (type === "cancel") {
-    return decision === "approved"
-      ? ORDER_RESPONSE_TEMPLATES.filter((t) => t.key === "cancel_approved")
-      : ORDER_RESPONSE_TEMPLATES.filter((t) => t.key === "cancel_rejected");
+  if (type === "exchange") {
+    return ORDER_RESPONSE_TEMPLATES.filter((t) =>
+      decision === "approved"
+        ? t.key === "exchange_approved" || t.key === "exchange_processing"
+        : t.key === "exchange_rejected"
+    );
   }
   return ORDER_RESPONSE_TEMPLATES.filter((t) =>
     decision === "approved"
@@ -38,11 +43,15 @@ function templatesForRequest(type: OrderRequest["type"], decision: "approved" | 
   );
 }
 
-export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProps) {
+export function OrderRequestPanel({
+  orderId,
+  orderTotal,
+  initialActiveRequestId = null,
+}: OrderRequestPanelProps) {
   const [requests, setRequests] = useState<OrderRequest[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(initialActiveRequestId);
   const [decision, setDecision] = useState<"approved" | "rejected">("approved");
-  const [templateKey, setTemplateKey] = useState<OrderResponseTemplateKey>("cancel_approved");
+  const [templateKey, setTemplateKey] = useState<OrderResponseTemplateKey>("refund_processing");
   const [refundDays, setRefundDays] = useState(7);
   const [customNote, setCustomNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -50,6 +59,16 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
   useEffect(() => {
     return subscribeOrderRequestsForOrder(orderId, setRequests);
   }, [orderId]);
+
+  useEffect(() => {
+    if (initialActiveRequestId) {
+      setActiveId(initialActiveRequestId);
+      const req = requests.find((r) => r.id === initialActiveRequestId);
+      if (req) {
+        setTemplateKey(req.type === "exchange" ? "exchange_processing" : "refund_processing");
+      }
+    }
+  }, [initialActiveRequestId, requests]);
 
   const pending = requests.filter((r) => r.status === "pending");
   const active = pending.find((r) => r.id === activeId) ?? null;
@@ -63,7 +82,7 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
     if (!active) return;
     const templates = templatesForRequest(active.type, decision);
     if (!templates.find((t) => t.key === templateKey)) {
-      setTemplateKey(templates[0]?.key ?? "cancel_approved");
+      setTemplateKey(templates[0]?.key ?? "refund_processing");
     }
   }, [active, decision, templateKey]);
 
@@ -97,7 +116,7 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
         }),
       {
         successMessage: "Response sent — customer can see it on their orders page",
-        liveOnStorefront: false,
+        liveOnStorefront: true,
         onSuccess: () => {
           setActiveId(null);
           setCustomNote("");
@@ -113,7 +132,7 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
     <Card className="mb-6 border-amber-200 bg-amber-50/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Cancel / refund requests
+          Cancel / refund / exchange requests
           {pending.length > 0 && (
             <Badge variant="warning">{pending.length} pending</Badge>
           )}
@@ -131,8 +150,17 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
               <div>
                 <p className="font-medium">
                   {requestTypeLabel(req.type)} request
-                  <Badge variant={req.status === "pending" ? "warning" : req.status === "approved" ? "success" : "destructive"} className="ml-2">
-                    {req.status}
+                  <Badge
+                    variant={
+                      req.status === "pending"
+                        ? "warning"
+                        : req.status === "approved"
+                          ? "success"
+                          : "destructive"
+                    }
+                    className="ml-2"
+                  >
+                    {requestStatusLabel(req.status)}
                   </Badge>
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
@@ -148,18 +176,25 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
                     setActiveId(req.id);
                     setDecision("approved");
                     setTemplateKey(
-                      req.type === "cancel" ? "cancel_approved" : "refund_processing"
+                      req.type === "exchange" ? "exchange_processing" : "refund_processing"
                     );
                   }}
                 >
-                  Respond
+                  Review & respond
                 </Button>
               )}
             </div>
             <p className="mt-3 text-sm text-zinc-700">{req.reason}</p>
+            {req.exchangeDetails && (
+              <p className="mt-2 text-sm text-zinc-600">
+                <span className="font-medium">Exchange for:</span> {req.exchangeDetails}
+              </p>
+            )}
             {req.adminResponse && (
               <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-                <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Sent to customer</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
+                  Sent to customer
+                </p>
                 <p className="mt-1">{req.adminResponse.message}</p>
                 <p className="mt-2 text-xs text-emerald-700">
                   {formatDate(new Date(req.adminResponse.sentAt))}
@@ -171,7 +206,9 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
 
         {active && active.status === "pending" && activeId === active.id && (
           <div className="rounded-lg border border-zinc-200 bg-white p-4">
-            <h3 className="font-medium">Reply to {requestTypeLabel(active.type).toLowerCase()} request</h3>
+            <h3 className="font-medium">
+              Reply to {requestTypeLabel(active.type).toLowerCase()} request
+            </h3>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -230,7 +267,9 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
             )}
 
             <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-              <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Customer will see</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-700">
+                Customer will see
+              </p>
               <p className="mt-1">{preview}</p>
             </div>
 
@@ -246,5 +285,64 @@ export function OrderRequestPanel({ orderId, orderTotal }: OrderRequestPanelProp
         )}
       </CardContent>
     </Card>
+  );
+}
+
+export function OrderRequestListItem({
+  req,
+  onRespond,
+}: {
+  req: OrderRequest;
+  onRespond: (req: OrderRequest) => void;
+}) {
+  return (
+    <div
+      className={`rounded-lg border bg-white p-4 ${
+        req.status === "pending" ? "border-amber-300" : "border-zinc-200"
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-medium">
+            {requestTypeLabel(req.type)} · {req.orderNumber}
+            <Badge
+              variant={
+                req.status === "pending"
+                  ? "warning"
+                  : req.status === "approved"
+                    ? "success"
+                    : "destructive"
+              }
+              className="ml-2"
+            >
+              {requestStatusLabel(req.status)}
+            </Badge>
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {formatDate(req.createdAt)} · {req.customerName}
+            {req.customerEmail ? ` · ${req.customerEmail}` : ""} · {formatCurrency(req.orderTotal)}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href={`/dashboard/orders/${req.orderId}`}
+            className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Open order
+          </Link>
+          {req.status === "pending" && (
+            <Button size="sm" onClick={() => onRespond(req)}>
+              Respond
+            </Button>
+          )}
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-zinc-700">{req.reason}</p>
+      {req.exchangeDetails && (
+        <p className="mt-2 text-sm text-zinc-600">
+          <span className="font-medium">Exchange for:</span> {req.exchangeDetails}
+        </p>
+      )}
+    </div>
   );
 }

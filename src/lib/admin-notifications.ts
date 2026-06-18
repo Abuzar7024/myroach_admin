@@ -3,6 +3,7 @@ export type AdminNotificationType =
   | "order_request"
   | "subscriber"
   | "review"
+  | "customer"
   | "catalog"
   | "storefront";
 

@@ -84,6 +84,14 @@ export interface ShippingAddress {
   country: string;
 }
 
+export interface OrderStatusUpdate {
+  status: OrderStatus;
+  at: Date;
+  by: "admin" | "system" | "customer";
+  note?: string;
+  trackingNumber?: string;
+}
+
 export interface Order {
   id: string;
   orderNumber?: string;
@@ -101,6 +109,7 @@ export interface Order {
   paymentStatus: PaymentStatus;
   shippingAddress: ShippingAddress;
   trackingNumber?: string;
+  statusHistory?: OrderStatusUpdate[];
   createdAt: Date;
   updatedAt: Date;
 }

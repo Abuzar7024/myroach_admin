@@ -47,3 +47,10 @@ export function pickImages(data: Record<string, unknown>): string[] {
   if (imageUrl) return [imageUrl];
   return [];
 }
+
+/** Firestore rejects undefined field values — omit them before addDoc/setDoc/updateDoc. */
+export function sanitizeFirestoreData<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as T;
+}

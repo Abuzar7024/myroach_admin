@@ -3,7 +3,9 @@ export const STORE_URL =
 
 export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY ?? "INR";
 
-export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
+export const USE_MOCK =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
 
 /** Firebase Storage needs Blaze plan on many projects. Default: save images in Firestore (free). */
 export const USE_FIREBASE_STORAGE = process.env.NEXT_PUBLIC_USE_FIREBASE_STORAGE === "true";

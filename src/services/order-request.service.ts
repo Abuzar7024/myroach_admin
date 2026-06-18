@@ -1,18 +1,21 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
   updateDoc,
   where,
   Timestamp,
+  arrayUnion,
 } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { runFirestoreWrite } from "@/lib/firestore-write";
 import { toDate, toNumber, toString } from "@/lib/firestore-helpers";
 import { USE_MOCK } from "@/lib/config";
 import {
+  normalizeRequestType,
   renderOrderResponseMessage,
   type OrderRequest,
   type OrderRequestAdminResponse,
@@ -21,6 +24,7 @@ import {
   type OrderResponseTemplateKey,
 } from "@/lib/order-request";
 import { formatCurrency } from "@/lib/utils";
+import type { OrderStatus } from "@/types";
 
 const COL = "orderRequests";
 
@@ -45,9 +49,11 @@ function fromFirestore(id: string, data: Record<string, unknown>): OrderRequest 
     customerName: toString(data.customerName),
     customerEmail: data.customerEmail != null ? toString(data.customerEmail) : undefined,
     orderTotal: toNumber(data.orderTotal),
-    type: toString(data.type, "cancel") as OrderRequestType,
+    type: normalizeRequestType(data.type),
     status: toString(data.status, "pending") as OrderRequestStatus,
     reason: toString(data.reason),
+    exchangeDetails: data.exchangeDetails != null ? toString(data.exchangeDetails) : undefined,
+    policyAccepted: data.policyAccepted === true,
     adminResponse: mapAdminResponse(data.adminResponse),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt ?? data.createdAt),
@@ -117,6 +123,15 @@ export async function getPendingRequestCount(): Promise<number> {
   return snap.size;
 }
 
+function buildStatusEvent(status: OrderStatus, note: string) {
+  return {
+    status,
+    at: Timestamp.now(),
+    by: "admin",
+    note,
+  };
+}
+
 export async function respondToOrderRequest(input: {
   requestId: string;
   orderId: string;
@@ -154,19 +169,37 @@ export async function respondToOrderRequest(input: {
       updatedAt: Timestamp.now(),
     });
 
-    if (input.decision === "approved") {
-      if (input.requestType === "cancel") {
-        await updateDoc(doc(db, "orders", input.orderId), {
-          status: "cancelled",
-          updatedAt: Timestamp.now(),
-        });
-      } else {
-        await updateDoc(doc(db, "orders", input.orderId), {
-          status: "refunded",
-          paymentStatus: "refunded",
-          updatedAt: Timestamp.now(),
-        });
-      }
+    if (input.decision !== "approved") return;
+
+    const orderSnap = await getDoc(doc(db, "orders", input.orderId));
+    const orderStatus = orderSnap.exists()
+      ? toString(orderSnap.data()?.status, "pending")
+      : "pending";
+
+    if (input.requestType === "exchange") {
+      await updateDoc(doc(db, "orders", input.orderId), {
+        status: "processing",
+        updatedAt: Timestamp.now(),
+        statusHistory: arrayUnion(
+          buildStatusEvent("processing", "Exchange approved — preparing replacement shipment.")
+        ),
+      });
+      return;
+    }
+
+    if (["shipped", "delivered"].includes(orderStatus)) {
+      await updateDoc(doc(db, "orders", input.orderId), {
+        status: "refunded",
+        paymentStatus: "refunded",
+        updatedAt: Timestamp.now(),
+        statusHistory: arrayUnion(buildStatusEvent("refunded", "Refund approved by admin.")),
+      });
+    } else {
+      await updateDoc(doc(db, "orders", input.orderId), {
+        status: "cancelled",
+        updatedAt: Timestamp.now(),
+        statusHistory: arrayUnion(buildStatusEvent("cancelled", "Cancellation approved by admin.")),
+      });
     }
   });
 }

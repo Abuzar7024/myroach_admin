@@ -1,11 +1,11 @@
-import { collection, doc, getDocs, getDoc, updateDoc, Timestamp, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, updateDoc, Timestamp, onSnapshot, arrayUnion } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { runFirestoreWrite } from "@/lib/firestore-write";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toNumber, toString, toArray } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
-import type { Order, OrderStatus, PaymentStatus } from "@/types";
+import type { Order, OrderStatus, PaymentStatus, OrderStatusUpdate } from "@/types";
 
 const COL = "orders";
 
@@ -18,6 +18,37 @@ function mapOrderItems(raw: unknown): Order["items"] {
     price: toNumber(item.price),
     image: item.image != null ? toString(item.image) : undefined,
   }));
+}
+
+function mapStatusHistory(raw: unknown): OrderStatusUpdate[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      const row = entry as Record<string, unknown>;
+      return {
+        status: toString(row.status, "pending") as OrderStatus,
+        at: toDate(row.at),
+        by: (toString(row.by, "admin") as OrderStatusUpdate["by"]),
+        note: row.note != null ? toString(row.note) : undefined,
+        trackingNumber: row.trackingNumber != null ? toString(row.trackingNumber) : undefined,
+      };
+    })
+    .filter((entry) => entry.status);
+}
+
+function buildStatusEvent(
+  status: OrderStatus,
+  note?: string,
+  trackingNumber?: string
+): Record<string, unknown> {
+  const event: Record<string, unknown> = {
+    status,
+    at: Timestamp.now(),
+    by: "admin",
+  };
+  if (note) event.note = note;
+  if (trackingNumber) event.trackingNumber = trackingNumber;
+  return event;
 }
 
 function fromFirestore(id: string, data: Record<string, unknown>): Order {
@@ -48,6 +79,7 @@ function fromFirestore(id: string, data: Record<string, unknown>): Order {
       country: toString(shipping.country, "India"),
     },
     trackingNumber: data.trackingNumber != null ? toString(data.trackingNumber) : undefined,
+    statusHistory: mapStatusHistory(data.statusHistory),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt ?? data.createdAt),
   };
@@ -138,7 +170,11 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
   }
   await runFirestoreWrite(async () => {
     const db = getFirestoreDb()!;
-    await updateDoc(doc(db, COL, id), { status, updatedAt: Timestamp.now() });
+    await updateDoc(doc(db, COL, id), {
+      status,
+      updatedAt: Timestamp.now(),
+      statusHistory: arrayUnion(buildStatusEvent(status, `Status updated to ${status}.`)),
+    });
   });
 }
 
@@ -150,7 +186,10 @@ export async function updateOrderPaymentStatus(id: string, paymentStatus: Paymen
   }
   await runFirestoreWrite(async () => {
     const db = getFirestoreDb()!;
-    await updateDoc(doc(db, COL, id), { paymentStatus, updatedAt: Timestamp.now() });
+    await updateDoc(doc(db, COL, id), {
+      paymentStatus,
+      updatedAt: Timestamp.now(),
+    });
   });
 }
 
@@ -173,6 +212,9 @@ export async function updateOrderTracking(id: string, trackingNumber: string): P
       trackingNumber,
       status: "shipped",
       updatedAt: Timestamp.now(),
+      statusHistory: arrayUnion(
+        buildStatusEvent("shipped", `Tracking ID: ${trackingNumber}`, trackingNumber)
+      ),
     });
   });
 }

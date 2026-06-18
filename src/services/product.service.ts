@@ -19,6 +19,7 @@ import {
   toBool,
   toArray,
   pickImages,
+  sanitizeFirestoreData,
 } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
@@ -112,11 +113,14 @@ export async function createProduct(data: Omit<Product, "id" | "createdAt" | "up
 
   return runFirestoreWrite(async () => {
     const db = getFirestoreDb()!;
-    const ref = await addDoc(collection(db, COL), {
-      ...data,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    const ref = await addDoc(
+      collection(db, COL),
+      sanitizeFirestoreData({
+        ...data,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      })
+    );
     return ref.id;
   });
 }
@@ -135,7 +139,10 @@ export async function updateProduct(id: string, data: Partial<Product>): Promise
 
   await runFirestoreWrite(async () => {
     const db = getFirestoreDb()!;
-    const payload: Record<string, unknown> = { ...data, updatedAt: Timestamp.now() };
+    const payload: Record<string, unknown> = sanitizeFirestoreData({
+      ...data,
+      updatedAt: Timestamp.now(),
+    });
     delete payload.id;
     delete payload.createdAt;
     await updateDoc(doc(db, COL, id), payload);

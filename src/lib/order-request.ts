@@ -1,12 +1,15 @@
-export type OrderRequestType = "cancel" | "refund";
+export type OrderRequestType = "refund" | "exchange";
 export type OrderRequestStatus = "pending" | "approved" | "rejected";
 
 export type OrderResponseTemplateKey =
-  | "cancel_approved"
-  | "cancel_rejected"
   | "refund_approved"
   | "refund_rejected"
-  | "refund_processing";
+  | "refund_processing"
+  | "exchange_approved"
+  | "exchange_rejected"
+  | "exchange_processing"
+  | "cancel_approved"
+  | "cancel_rejected";
 
 export interface OrderRequestAdminResponse {
   templateKey: OrderResponseTemplateKey;
@@ -27,6 +30,8 @@ export interface OrderRequest {
   type: OrderRequestType;
   status: OrderRequestStatus;
   reason: string;
+  exchangeDetails?: string;
+  policyAccepted?: boolean;
   adminResponse?: OrderRequestAdminResponse;
   createdAt: Date;
   updatedAt: Date;
@@ -43,36 +48,19 @@ export interface OrderResponseTemplate {
 
 export const ORDER_RESPONSE_TEMPLATES: OrderResponseTemplate[] = [
   {
-    key: "cancel_approved",
-    label: "Cancellation approved",
-    defaultMessage: "Your cancellation request has been approved. Your order will not be shipped.",
-    showRefundDays: false,
-    defaultRefundDays: 0,
-    showCustomNote: true,
-  },
-  {
-    key: "cancel_rejected",
-    label: "Cancellation declined",
+    key: "refund_processing",
+    label: "Refund — processing",
     defaultMessage:
-      "We could not cancel your order because it is already being prepared for dispatch. Contact support if you need help.",
-    showRefundDays: false,
-    defaultRefundDays: 0,
+      "We received your refund request and it is being processed. You will receive your payment within {refundDays} business days if approved.",
+    showRefundDays: true,
+    defaultRefundDays: 7,
     showCustomNote: true,
   },
   {
     key: "refund_approved",
     label: "Refund approved",
     defaultMessage:
-      "Your refund has been approved. You will receive your payment within {refundDays} business days.",
-    showRefundDays: true,
-    defaultRefundDays: 7,
-    showCustomNote: true,
-  },
-  {
-    key: "refund_processing",
-    label: "Refund processing",
-    defaultMessage:
-      "We are processing your refund. You will receive your payment within {refundDays} business days.",
+      "Your refund has been approved. You will receive {amount} within {refundDays} business days.",
     showRefundDays: true,
     defaultRefundDays: 7,
     showCustomNote: true,
@@ -85,7 +73,55 @@ export const ORDER_RESPONSE_TEMPLATES: OrderResponseTemplate[] = [
     defaultRefundDays: 0,
     showCustomNote: true,
   },
+  {
+    key: "exchange_processing",
+    label: "Exchange — processing",
+    defaultMessage:
+      "We received your exchange request and our team is reviewing it. We'll confirm size or product availability shortly.",
+    showRefundDays: false,
+    defaultRefundDays: 0,
+    showCustomNote: true,
+  },
+  {
+    key: "exchange_approved",
+    label: "Exchange approved",
+    defaultMessage:
+      "Your exchange has been approved. We will ship your replacement after we receive or verify your return.",
+    showRefundDays: false,
+    defaultRefundDays: 0,
+    showCustomNote: true,
+  },
+  {
+    key: "exchange_rejected",
+    label: "Exchange declined",
+    defaultMessage: "Your exchange request could not be approved at this time.",
+    showRefundDays: false,
+    defaultRefundDays: 0,
+    showCustomNote: true,
+  },
+  {
+    key: "cancel_approved",
+    label: "Cancellation approved (legacy)",
+    defaultMessage: "Your cancellation request has been approved. Your order will not be shipped.",
+    showRefundDays: false,
+    defaultRefundDays: 0,
+    showCustomNote: true,
+  },
+  {
+    key: "cancel_rejected",
+    label: "Cancellation declined (legacy)",
+    defaultMessage:
+      "We could not cancel your order because it is already being prepared for dispatch.",
+    showRefundDays: false,
+    defaultRefundDays: 0,
+    showCustomNote: true,
+  },
 ];
+
+export function normalizeRequestType(value: unknown): OrderRequestType {
+  if (value === "exchange") return "exchange";
+  return "refund";
+}
 
 export function getOrderResponseTemplate(key: OrderResponseTemplateKey) {
   return ORDER_RESPONSE_TEMPLATES.find((t) => t.key === key) ?? ORDER_RESPONSE_TEMPLATES[0];
@@ -107,5 +143,11 @@ export function renderOrderResponseMessage(
 }
 
 export function requestTypeLabel(type: OrderRequestType) {
-  return type === "cancel" ? "Cancellation" : "Refund";
+  return type === "exchange" ? "Exchange" : "Refund";
+}
+
+export function requestStatusLabel(status: OrderRequestStatus) {
+  if (status === "pending") return "Pending review";
+  if (status === "approved") return "Approved";
+  return "Declined";
 }
