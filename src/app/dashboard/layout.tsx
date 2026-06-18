@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
 import { SyncStatusBar } from "@/components/layout/sync-status";
 import { SyncProvider } from "@/providers/sync-provider";
+import { AdminNotificationsProvider } from "@/providers/admin-notifications-provider";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
@@ -39,16 +40,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SyncProvider>
-      <div className="min-h-screen bg-zinc-100">
-        <Sidebar />
-        <main className="lg:pl-64">
-          <div className="p-6 pt-16 lg:pt-6">
-            <TopBar />
-            <SyncStatusBar />
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </div>
-        </main>
-      </div>
+      <AdminNotificationsProvider>
+        <div className="min-h-screen bg-zinc-100">
+          <Sidebar />
+          <main className="lg:pl-64">
+            <div className="p-6 pt-16 lg:pt-6">
+              <TopBar />
+              <SyncStatusBar />
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </div>
+          </main>
+        </div>
+      </AdminNotificationsProvider>
     </SyncProvider>
   );
 }

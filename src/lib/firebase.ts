@@ -34,8 +34,10 @@ function initAppCheck(firebaseApp: FirebaseApp) {
   const recaptchaKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_RECAPTCHA_KEY;
   const forceAppCheck = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED === "true";
 
-  // Skip App Check in local dev unless explicitly enabled — unregistered debug tokens cause "client offline"
-  if (process.env.NODE_ENV === "development" && !forceAppCheck) return;
+  // In dev, still init App Check when a debug token exists — required if Storage/Firestore enforce App Check
+  if (process.env.NODE_ENV === "development" && !forceAppCheck && !debugToken && !recaptchaKey) {
+    return;
+  }
 
   if (debugToken && typeof window !== "undefined" && process.env.NODE_ENV === "development") {
     // @ts-expect-error Firebase debug token
@@ -63,10 +65,19 @@ function initAppCheck(firebaseApp: FirebaseApp) {
   }
 }
 
+/** Wait for App Check token when enabled (with timeout). */
+export async function ensureAppCheckReady(timeoutMs = 10_000): Promise<void> {
+  initFirebase();
+  if (!appCheckReady) return;
+  await Promise.race([
+    appCheckReady,
+    new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
 /** Wait for App Check token when enabled. */
 export async function ensureFirestoreOnline(): Promise<void> {
-  initFirebase();
-  if (appCheckReady) await appCheckReady;
+  await ensureAppCheckReady();
 }
 
 export function initFirebase() {
@@ -106,6 +117,11 @@ export function getFirestoreDb(): Firestore | undefined {
 export function getFirebaseApp(): FirebaseApp | undefined {
   initFirebase();
   return app;
+}
+
+export function getFirebaseStorage(): FirebaseStorage | undefined {
+  initFirebase();
+  return storage;
 }
 
 /** @deprecated Use ensureFirestoreOnline */

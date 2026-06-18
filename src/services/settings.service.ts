@@ -1,5 +1,7 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
+import { runFirestoreWrite } from "@/lib/firestore-write";
+import { assertPersistedImageUrl } from "@/lib/validate-payload";
 import { mockStore } from "@/lib/mock-data";
 import { safeData } from "@/lib/safe-async";
 import { USE_MOCK } from "@/lib/config";
@@ -20,9 +22,12 @@ async function fetchSettings(): Promise<Settings> {
 async function fetchHomepage(): Promise<HomepageContent> {
   initFirebase();
   const db = getFirestoreDb();
-  if (!db) return { ...mockStore.homepage };
+  const defaults: HomepageContent = { ...mockStore.homepage };
+  if (!db) return defaults;
   const snap = await getDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID));
-  return snap.exists() ? (snap.data() as HomepageContent) : { ...mockStore.homepage };
+  return snap.exists()
+    ? { ...defaults, ...(snap.data() as Partial<HomepageContent>) }
+    : defaults;
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -31,14 +36,17 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function updateSettings(data: Partial<Settings>): Promise<void> {
+  if (data.logo) assertPersistedImageUrl(data.logo, "Logo");
+
   if (USE_MOCK) {
     mockStore.settings = { ...mockStore.settings, ...data };
     return;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  await setDoc(doc(db, SETTINGS_DOC, SETTINGS_ID), data, { merge: true });
+
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await setDoc(doc(db, SETTINGS_DOC, SETTINGS_ID), data, { merge: true });
+  });
 }
 
 export async function getHomepageContent(): Promise<HomepageContent> {
@@ -51,8 +59,9 @@ export async function updateHomepageContent(data: Partial<HomepageContent>): Pro
     mockStore.homepage = { ...mockStore.homepage, ...data };
     return;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  await setDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID), data, { merge: true });
+
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await setDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID), data, { merge: true });
+  });
 }

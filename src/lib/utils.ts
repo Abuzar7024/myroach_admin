@@ -6,12 +6,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+function hasDecimalPart(value: number): boolean {
+  return Math.abs(Math.round(value * 100) % 100) > 0;
+}
+
 export function formatCurrency(amount: number) {
+  if (!Number.isFinite(amount)) {
+    return CURRENCY === "INR" ? "₹0" : "0";
+  }
+
+  const value = roundMoney(amount);
+  const fractionDigits = hasDecimalPart(value) ? 2 : 0;
+
+  if (CURRENCY === "INR") {
+    const numberPart = new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: 2,
+    }).format(value);
+    return `₹${numberPart}`;
+  }
+
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: CURRENCY,
-    maximumFractionDigits: 0,
-  }).format(amount);
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 export function formatDate(date: Date | string) {

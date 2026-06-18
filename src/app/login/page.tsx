@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
-import { bypassLogin, login } from "@/services/auth.service";
+import { login } from "@/services/auth.service";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -18,19 +18,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { setUser } = useAuth();
-
-  const isDev = process.env.NODE_ENV === "development";
-
-  function handleBypassLogin() {
-    try {
-      const user = bypassLogin();
-      setUser(user);
-      toast.success("Dev bypass — dashboard unlocked (no Firebase auth)");
-      router.replace("/dashboard");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Bypass failed");
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,8 +66,8 @@ export default function LoginPage() {
             {!USE_MOCK && FIREBASE_CONFIGURED && (
               <div className="mb-4 rounded-md border border-zinc-700 bg-zinc-800/50 p-3 text-xs text-zinc-400 space-y-1">
                 <p>Use the email and password from Firebase Authentication.</p>
-                <p>Your account must have <span className="text-zinc-300">role: admin</span> in Firestore <span className="text-zinc-300">users/&#123;uid&#125;</span>.</p>
-                <p>If Firestore fails: disable App Check enforcement for dev, or deploy rules.</p>
+                <p>Your account must have <span className="text-zinc-300">role: admin</span> in Firestore <span className="text-zinc-300">users/&#123;uid&#125;</span> (set automatically on first admin login after rules are deployed).</p>
+                <p>If you see &quot;Missing or insufficient permissions&quot;: run <span className="font-mono text-zinc-300">firebase login</span> then <span className="font-mono text-zinc-300">firebase deploy --only firestore:rules,storage</span> from the admin project folder.</p>
               </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -112,17 +99,6 @@ export default function LoginPage() {
               <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200" disabled={loading}>
                 {loading ? "Signing in..." : "Sign in to Admin"}
               </Button>
-              {isDev && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-zinc-600 bg-transparent text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                  disabled={loading}
-                  onClick={handleBypassLogin}
-                >
-                  Skip login (dev only)
-                </Button>
-              )}
             </form>
           </CardContent>
         </Card>

@@ -225,12 +225,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Table>
-              <THead><TR><TH>Product</TH><TH>Stock</TH><TH>SKU</TH></TR></THead>
+              <THead><TR><TH>Product</TH><TH>Stock</TH><TH>Sizes</TH></TR></THead>
               <TBody>
                 {lowStock.length === 0 ? (
                   <TR><TD colSpan={3} className="text-center text-zinc-500">All stock levels healthy</TD></TR>
                 ) : lowStock.map((p) => (
-                  <TR key={p.id}><TD>{p.title}</TD><TD><Badge variant="warning">{p.stock}</Badge></TD><TD>{p.sku}</TD></TR>
+                  <TR key={p.id}><TD>{p.title}</TD><TD><Badge variant="warning">{p.stock}</Badge></TD><TD className="text-xs">{p.sizes?.join(", ") || "—"}</TD></TR>
                 ))}
               </TBody>
             </Table>

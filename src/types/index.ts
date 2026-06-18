@@ -11,6 +11,8 @@ export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 export type DiscountType = "percentage" | "fixed";
 export type VariantType = "size" | "color";
 
+export type CatalogGender = "male" | "female" | "unisex";
+
 export interface User {
   uid: string;
   name: string;
@@ -34,12 +36,20 @@ export interface Product {
   price: number;
   salePrice?: number;
   stock: number;
-  sku: string;
+  sku?: string;
   categoryId: string;
+  categorySlug?: string;
+  gender?: CatalogGender;
   tags: string[];
   images: string[];
+  /** Selected size labels shown on storefront (e.g. XS–XXL). */
+  sizes: string[];
   variants: ProductVariant[];
+  minOrderQty: number;
+  maxOrderQty: number;
+  returnPolicy: string;
   featured: boolean;
+  featuredDisplaySeconds?: number;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +60,8 @@ export interface Category {
   name: string;
   slug: string;
   image: string;
+  description?: string;
+  gender: CatalogGender;
   active: boolean;
 }
 
@@ -74,9 +86,11 @@ export interface ShippingAddress {
 
 export interface Order {
   id: string;
+  orderNumber?: string;
   userId: string;
   customerName?: string;
   customerEmail?: string;
+  customerPhone?: string;
   items: OrderItem[];
   subtotal: number;
   tax: number;
@@ -86,6 +100,7 @@ export interface Order {
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   shippingAddress: ShippingAddress;
+  trackingNumber?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,10 +133,17 @@ export interface HomepageContent {
   promoTitle: string;
   promoSubtitle: string;
   showFeatured: boolean;
+  showFeaturedProducts: boolean;
+  featuredRotateSeconds: number;
   showBestSellers: boolean;
   showNewArrivals: boolean;
   showPromo: boolean;
+  showShopTeaser: boolean;
+  showBrandStory: boolean;
+  showNewsletter: boolean;
 }
+
+import type { FooterConfig } from "@/lib/footer-config";
 
 export interface Settings {
   storeName: string;
@@ -140,6 +162,7 @@ export interface Settings {
     linkedin?: string;
   };
   footerContent: string;
+  footerConfig?: FooterConfig;
   policies: {
     returnPolicy?: string;
     privacyPolicy?: string;

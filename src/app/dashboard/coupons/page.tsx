@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { DashboardHeader } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { runSave } from "@/lib/save-action";
 import { getCoupons, createCoupon, updateCoupon, deleteCoupon } from "@/services/coupon.service";
 import type { Coupon } from "@/types";
 
@@ -19,15 +19,24 @@ export default function CouponsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<{ code: string; discountType: "percentage" | "fixed"; discountValue: number; minimumOrderAmount: number; usageLimit: number }>({ code: "", discountType: "percentage", discountValue: 10, minimumOrderAmount: 0, usageLimit: 100 });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { getCoupons().then((c) => { setCoupons(c); setLoading(false); }); }, []);
 
   async function handleCreate() {
     if (!form.code) return;
-    const id = await createCoupon({ ...form, expiryDate: new Date(Date.now() + 30 * 86400000), active: true });
-    setCoupons((prev) => [...prev, { id, ...form, expiryDate: new Date(Date.now() + 30 * 86400000), active: true }]);
-    toast.success("Coupon created");
-    setShowForm(false);
+    setSaving(true);
+    await runSave(
+      () => createCoupon({ ...form, expiryDate: new Date(Date.now() + 30 * 86400000), active: true }),
+      {
+        successMessage: "Coupon created",
+        onSuccess: async () => {
+          setCoupons(await getCoupons());
+          setShowForm(false);
+        },
+      }
+    );
+    setSaving(false);
   }
 
   if (loading) return <PageLoader />;
@@ -45,7 +54,7 @@ export default function CouponsPage() {
           <div><Label>Type</Label><Select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value as "percentage" | "fixed" })}><option value="percentage">Percentage</option><option value="fixed">Fixed</option></Select></div>
           <div><Label>Value</Label><Input type="number" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: Number(e.target.value) })} /></div>
           <div><Label>Min Order</Label><Input type="number" value={form.minimumOrderAmount} onChange={(e) => setForm({ ...form, minimumOrderAmount: Number(e.target.value) })} /></div>
-          <div className="flex gap-2 md:col-span-2"><Button onClick={handleCreate}>Create</Button><Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button></div>
+          <div className="flex gap-2 md:col-span-2"><Button onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Create"}</Button><Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button></div>
         </div>
       )}
 
@@ -63,8 +72,8 @@ export default function CouponsPage() {
                 <TD><Badge variant={c.active ? "success" : "destructive"}>{c.active ? "Active" : "Disabled"}</Badge></TD>
                 <TD>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={async () => { await updateCoupon(c.id, { active: !c.active }); setCoupons((prev) => prev.map((x) => x.id === c.id ? { ...x, active: !x.active } : x)); }}>{c.active ? "Disable" : "Enable"}</Button>
-                    <ConfirmDialog title="Delete coupon?" description="This cannot be undone." onConfirm={async () => { await deleteCoupon(c.id); setCoupons((prev) => prev.filter((x) => x.id !== c.id)); toast.success("Deleted"); }} />
+                    <Button variant="outline" size="sm" onClick={() => { void runSave(() => updateCoupon(c.id, { active: !c.active }), { onSuccess: async () => setCoupons(await getCoupons()) }); }}>{c.active ? "Disable" : "Enable"}</Button>
+                    <ConfirmDialog title="Delete coupon?" description="This cannot be undone." onConfirm={() => { void runSave(() => deleteCoupon(c.id), { successMessage: "Deleted", onSuccess: async () => setCoupons(await getCoupons()) }); }} />
                   </div>
                 </TD>
               </TR>

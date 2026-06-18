@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { toast } from "sonner";
 import { Plus, Search, ExternalLink } from "lucide-react";
 import { DashboardHeader } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader, EmptyState } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatCurrency, storeProductUrl } from "@/lib/utils";
+import { runSave } from "@/lib/save-action";
 import { getProducts, deleteProduct, updateProduct } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
 import type { Product, Category } from "@/types";
@@ -41,22 +41,30 @@ export default function ProductsPage() {
       const matchSearch =
         !search ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
-        p.sku.toLowerCase().includes(search.toLowerCase());
+        p.sizes?.some((s) => s.toLowerCase().includes(search.toLowerCase()));
       const matchCat = !categoryFilter || p.categoryId === categoryFilter;
       return matchSearch && matchCat;
     });
   }, [products, search, categoryFilter]);
 
   async function handleDelete(id: string) {
-    await deleteProduct(id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Product deleted");
+    await runSave(
+      () => deleteProduct(id),
+      {
+        successMessage: "Product deleted",
+        onSuccess: async () => setProducts(await getProducts()),
+      }
+    );
   }
 
   async function toggleActive(id: string, active: boolean) {
-    await updateProduct(id, { active: !active });
-    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, active: !active } : p)));
-    toast.success("Product updated");
+    await runSave(
+      () => updateProduct(id, { active: !active }),
+      {
+        successMessage: "Product updated",
+        onSuccess: async () => setProducts(await getProducts()),
+      }
+    );
   }
 
   if (loading) return <PageLoader />;
@@ -92,7 +100,7 @@ export default function ProductsPage() {
           <Table>
             <THead>
               <TR>
-                <TH>Product</TH><TH>SKU</TH><TH>Price</TH><TH>Stock</TH><TH>Status</TH><TH>Actions</TH>
+                <TH>Product</TH><TH>Sizes</TH><TH>Price</TH><TH>Stock</TH><TH>Status</TH><TH>Actions</TH>
               </TR>
             </THead>
             <TBody>
@@ -111,7 +119,7 @@ export default function ProductsPage() {
                       </div>
                     </div>
                   </TD>
-                  <TD className="font-mono text-xs">{p.sku}</TD>
+                  <TD className="text-xs text-zinc-600">{p.sizes?.join(", ") || "—"}</TD>
                   <TD>{formatCurrency(p.salePrice ?? p.price)}</TD>
                   <TD>
                     <Badge variant={p.stock <= 10 ? "warning" : "default"}>{p.stock}</Badge>

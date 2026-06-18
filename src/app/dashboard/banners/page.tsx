@@ -12,6 +12,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { runSave } from "@/lib/save-action";
 import { getBanners, createBanner, updateBanner, deleteBanner } from "@/services/banner.service";
 import type { Banner } from "@/types";
 
@@ -23,6 +24,7 @@ export default function BannersPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => { getBanners().then((b) => { setBanners(b); setLoading(false); }); }, []);
 
@@ -32,18 +34,35 @@ export default function BannersPage() {
       toast.error("Upload a banner image first");
       return;
     }
+    setSaving(true);
     if (editId) {
-      await updateBanner(editId, form);
-      setBanners((prev) => prev.map((b) => b.id === editId ? { ...b, ...form } : b));
-      toast.success("Banner updated — live on storefront when site reads `banners` collection");
+      await runSave(
+        () => updateBanner(editId, form),
+        {
+          successMessage: "Banner updated — live on storefront when site reads `banners` collection",
+          onSuccess: async () => {
+            setBanners(await getBanners());
+            setShowForm(false);
+            setEditId(null);
+            setForm(emptyForm);
+          },
+        }
+      );
     } else {
-      const id = await createBanner({ ...form, active: true });
-      setBanners((prev) => [...prev, { id, ...form, active: true }]);
-      toast.success("Banner created");
+      await runSave(
+        () => createBanner({ ...form, active: true }),
+        {
+          successMessage: "Banner created",
+          onSuccess: async () => {
+            setBanners(await getBanners());
+            setShowForm(false);
+            setEditId(null);
+            setForm(emptyForm);
+          },
+        }
+      );
     }
-    setShowForm(false);
-    setEditId(null);
-    setForm(emptyForm);
+    setSaving(false);
   }
 
   if (loading) return <PageLoader />;
@@ -73,7 +92,7 @@ export default function BannersPage() {
             />
           </div>
           <div className="flex gap-2 md:col-span-2">
-            <Button onClick={handleSave}>{editId ? "Update" : "Create"}</Button>
+            <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : editId ? "Update" : "Create"}</Button>
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
           </div>
         </div>
@@ -92,8 +111,8 @@ export default function BannersPage() {
                 <TD>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => { setEditId(b.id); setForm({ title: b.title, subtitle: b.subtitle, redirectUrl: b.redirectUrl, position: b.position, image: b.image }); setShowForm(true); }}>Edit</Button>
-                    <Button variant="outline" size="sm" onClick={async () => { await updateBanner(b.id, { active: !b.active }); setBanners((prev) => prev.map((x) => x.id === b.id ? { ...x, active: !x.active } : x)); }}>{b.active ? "Disable" : "Enable"}</Button>
-                    <ConfirmDialog title="Delete banner?" description="This will remove it from homepage." onConfirm={async () => { await deleteBanner(b.id); setBanners((prev) => prev.filter((x) => x.id !== b.id)); toast.success("Deleted"); }} />
+                    <Button variant="outline" size="sm" onClick={() => { void runSave(() => updateBanner(b.id, { active: !b.active }), { onSuccess: async () => setBanners(await getBanners()) }); }}>{b.active ? "Disable" : "Enable"}</Button>
+                    <ConfirmDialog title="Delete banner?" description="This will remove it from homepage." onConfirm={() => { void runSave(() => deleteBanner(b.id), { successMessage: "Deleted", onSuccess: async () => setBanners(await getBanners()) }); }} />
                   </div>
                 </TD>
               </TR>

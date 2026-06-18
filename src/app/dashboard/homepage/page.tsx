@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
 import { DashboardHeader } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
 import { STORE_URL } from "@/lib/utils";
+import { runSave } from "@/lib/save-action";
 import { getHomepageContent, updateHomepageContent } from "@/services/settings.service";
 import { getProducts } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
@@ -33,8 +33,13 @@ export default function HomepagePage() {
   async function save() {
     if (!homepage) return;
     setSaving(true);
-    await updateHomepageContent(homepage);
-    toast.success("Homepage updated — changes reflect on live store");
+    await runSave(
+      () => updateHomepageContent(homepage),
+      {
+        successMessage: "Homepage updated — changes reflect on live store",
+        onSuccess: async () => setHomepage(await getHomepageContent()),
+      }
+    );
     setSaving(false);
   }
 
@@ -63,10 +68,14 @@ export default function HomepagePage() {
           <CardHeader><CardTitle>Section Visibility</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {[
+              { key: "showFeaturedProducts", label: "Featured Products" },
               { key: "showFeatured", label: "Featured Collections" },
               { key: "showBestSellers", label: "Best Sellers" },
               { key: "showNewArrivals", label: "New Arrivals" },
               { key: "showPromo", label: "Promotional Banner" },
+              { key: "showShopTeaser", label: "Shop Teaser (static image)" },
+              { key: "showBrandStory", label: "Brand Story (static / About)" },
+              { key: "showNewsletter", label: "Newsletter Signup" },
             ].map((s) => (
               <label key={s.key} className="flex items-center justify-between rounded-md border p-3">
                 <span className="text-sm font-medium">{s.label}</span>
@@ -85,6 +94,44 @@ export default function HomepagePage() {
           <CardContent className="space-y-3">
             <div><Label>Title</Label><Input value={homepage.promoTitle} onChange={(e) => setHomepage({ ...homepage, promoTitle: e.target.value })} /></div>
             <div><Label>Subtitle</Label><Input value={homepage.promoSubtitle} onChange={(e) => setHomepage({ ...homepage, promoSubtitle: e.target.value })} /></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Featured Products</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-zinc-500">
+              Products marked &quot;Featured&quot; in Products appear on the storefront — 3 at a time.
+            </p>
+            <div>
+              <Label>Default rotation time (seconds)</Label>
+              <Input
+                type="number"
+                min={3}
+                max={60}
+                value={homepage.featuredRotateSeconds ?? 5}
+                onChange={(e) =>
+                  setHomepage({
+                    ...homepage,
+                    featuredRotateSeconds: Math.max(3, Math.min(60, Number(e.target.value) || 5)),
+                  })
+                }
+              />
+            </div>
+            <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+              {products.filter((p) => p.featured).length === 0 ? (
+                <p className="text-sm text-zinc-500">No featured products yet.</p>
+              ) : (
+                products
+                  .filter((p) => p.featured)
+                  .map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-sm">
+                      <span>{p.title}</span>
+                      <span className="text-zinc-500">{p.featuredDisplaySeconds ?? homepage.featuredRotateSeconds ?? 5}s</span>
+                    </div>
+                  ))
+              )}
+            </div>
           </CardContent>
         </Card>
 

@@ -28,6 +28,7 @@ import { useState } from "react";
 import { cn, STORE_URL, USE_MOCK } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useSync } from "@/providers/sync-provider";
+import { useAdminNotifications } from "@/providers/admin-notifications-provider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -78,7 +79,18 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { connected, counts } = useSync();
+  const { unreadByHref, unreadCount } = useAdminNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  function navBadge(href: string) {
+    const count = unreadByHref[href] ?? 0;
+    if (!count) return null;
+    return (
+      <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+        {count > 9 ? "9+" : count}
+      </span>
+    );
+  }
 
   return (
     <>
@@ -100,14 +112,21 @@ export function Sidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b px-4">
+        <div className="flex h-16 items-center justify-between gap-2 border-b px-4">
           <div>
             <span className="text-lg font-bold tracking-tight text-zinc-900">MY ROACH</span>
             <p className="text-[10px] uppercase tracking-widest text-zinc-400">Admin Panel</p>
           </div>
-          <Badge variant={USE_MOCK ? "warning" : connected ? "success" : "destructive"} className="text-[10px]">
-            {USE_MOCK ? "Mock" : connected ? "Live" : "Offline"}
-          </Badge>
+          <div className="flex items-center gap-1.5">
+            {unreadCount > 0 && (
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white" title="Unread updates">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+            <Badge variant={USE_MOCK ? "warning" : connected ? "success" : "destructive"} className="text-[10px]">
+              {USE_MOCK ? "Mock" : connected ? "Live" : "Offline"}
+            </Badge>
+          </div>
         </div>
 
         <a
@@ -150,6 +169,7 @@ export function Sidebar() {
                     >
                       <item.icon size={17} />
                       {item.label}
+                      {navBadge(item.href)}
                     </Link>
                   );
                 })}

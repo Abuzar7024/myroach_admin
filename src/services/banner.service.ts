@@ -1,5 +1,7 @@
 import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
+import { runFirestoreWrite } from "@/lib/firestore-write";
+import { assertBannerPayload, assertPersistedImageUrl } from "@/lib/validate-payload";
 import { mockStore } from "@/lib/mock-data";
 import { toString, toBool, toNumber } from "@/lib/firestore-helpers";
 import { safeList } from "@/lib/safe-async";
@@ -34,28 +36,35 @@ export async function getBanners(): Promise<Banner[]> {
 }
 
 export async function createBanner(data: Omit<Banner, "id">): Promise<string> {
+  assertBannerPayload(data);
+
   if (USE_MOCK) {
     const id = `ban-${Date.now()}`;
     mockStore.banners.push({ ...data, id });
     return id;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  const ref = await addDoc(collection(db, COL), data);
-  return ref.id;
+
+  return runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    const ref = await addDoc(collection(db, COL), { ...data, slot: "hero" });
+    return ref.id;
+  });
 }
 
 export async function updateBanner(id: string, data: Partial<Banner>): Promise<void> {
+  if (data.title != null && !data.title.trim()) throw new Error("Banner title is required");
+  if (data.image) assertPersistedImageUrl(data.image, "Banner image");
+
   if (USE_MOCK) {
     const idx = mockStore.banners.findIndex((b) => b.id === id);
     if (idx >= 0) mockStore.banners[idx] = { ...mockStore.banners[idx], ...data };
     return;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  await updateDoc(doc(db, COL, id), data);
+
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await updateDoc(doc(db, COL, id), { ...data, slot: "hero" });
+  });
 }
 
 export async function deleteBanner(id: string): Promise<void> {
@@ -63,8 +72,9 @@ export async function deleteBanner(id: string): Promise<void> {
     mockStore.banners = mockStore.banners.filter((b) => b.id !== id);
     return;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  await deleteDoc(doc(db, COL, id));
+
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await deleteDoc(doc(db, COL, id));
+  });
 }

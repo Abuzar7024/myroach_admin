@@ -24,12 +24,12 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == uid;
     }
 
-    // Login bootstrap: authenticated users manage their own profile (create on first admin sign-in)
+    // Users: owner manages own profile; admins manage all (required for admin panel + isAdmin())
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow read, update, delete: if isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /products/{productId} {
@@ -44,8 +44,28 @@ service cloud.firestore {
 
     match /orders/{orderId} {
       allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
-      allow create: if isAuth();
-      allow update, delete: if isAdmin();
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin() || (
+        isAuth()
+        && resource.data.userId == request.auth.uid
+        && resource.data.status in ['pending', 'confirmed']
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'cancelledAt'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /orderRequests/{requestId} {
+      allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
+      allow create: if isAuth()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.type in ['cancel', 'refund']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10
+        && request.resource.data.reason.size() <= 500;
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     match /coupons/{couponId} {
@@ -88,9 +108,13 @@ service cloud.firestore {
     }
 
     match /cart/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create, update: if isOwner(userId);
-      allow delete: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId);
+      allow read: if isAdmin();
+    }
+
+    match /wishlist/{userId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isAdmin();
     }
   }
 }

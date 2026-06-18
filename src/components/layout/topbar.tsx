@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { STORE_URL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/layout/notification-bell";
 
 export function TopBar() {
   const pathname = usePathname();
@@ -27,12 +28,15 @@ export function TopBar() {
             </span>
           ))}
         </nav>
-        <a href={STORE_URL} target="_blank" rel="noopener noreferrer" className="ml-auto">
-          <Button variant="outline" size="sm" className="gap-2">
-            <ExternalLink size={14} />
-            Open Store
-          </Button>
-        </a>
+        <div className="ml-auto flex items-center gap-2">
+          <NotificationBell />
+          <a href={STORE_URL} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm" className="gap-2">
+              <ExternalLink size={14} />
+              Open Store
+            </Button>
+          </a>
+        </div>
       </div>
     </header>
   );

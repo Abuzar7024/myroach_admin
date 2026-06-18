@@ -1,3 +1,4 @@
+import { DEFAULT_FOOTER_CONFIG } from "@/lib/footer-config";
 import type {
   Banner,
   Category,
@@ -8,6 +9,7 @@ import type {
   Settings,
   User,
 } from "@/types";
+import { DEFAULT_MAX_ORDER_QTY, DEFAULT_MIN_ORDER_QTY, DEFAULT_RETURN_POLICY } from "@/lib/catalog";
 
 const now = new Date();
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000);
@@ -48,10 +50,10 @@ export const mockUsers: User[] = [
 ];
 
 export const mockCategories: Category[] = [
-  { id: "cat-1", name: "T-Shirts", slug: "t-shirts", image: "https://picsum.photos/seed/cat1/400/400", active: true },
-  { id: "cat-2", name: "Hoodies", slug: "hoodies", image: "https://picsum.photos/seed/cat2/400/400", active: true },
-  { id: "cat-3", name: "Accessories", slug: "accessories", image: "https://picsum.photos/seed/cat3/400/400", active: true },
-  { id: "cat-4", name: "Pants", slug: "pants", image: "https://picsum.photos/seed/cat4/400/400", active: false },
+  { id: "cat-1", name: "T-Shirts", slug: "t-shirts", image: "", gender: "unisex", active: true },
+  { id: "cat-2", name: "Hoodies", slug: "hoodies", image: "", gender: "male", active: true },
+  { id: "cat-3", name: "Accessories", slug: "accessories", image: "", gender: "female", active: true },
+  { id: "cat-4", name: "Pants", slug: "pants", image: "", gender: "unisex", active: false },
 ];
 
 export const mockProducts: Product[] = [
@@ -68,7 +70,15 @@ export const mockProducts: Product[] = [
     categoryId: "cat-1",
     tags: ["bestseller", "cotton"],
     images: ["https://picsum.photos/seed/prod1/600/600"],
-    variants: [{ type: "size", value: "S" }, { type: "size", value: "M" }, { type: "size", value: "L" }, { type: "color", value: "Black" }],
+    sizes: ["S", "M", "L"],
+    variants: [
+      { type: "size", value: "S" },
+      { type: "size", value: "M" },
+      { type: "size", value: "L" },
+    ],
+    minOrderQty: DEFAULT_MIN_ORDER_QTY,
+    maxOrderQty: DEFAULT_MAX_ORDER_QTY,
+    returnPolicy: DEFAULT_RETURN_POLICY,
     featured: true,
     active: true,
     createdAt: daysAgo(45),
@@ -86,7 +96,11 @@ export const mockProducts: Product[] = [
     categoryId: "cat-2",
     tags: ["hoodie", "winter"],
     images: ["https://picsum.photos/seed/prod2/600/600"],
-    variants: [{ type: "size", value: "M" }, { type: "size", value: "L" }, { type: "color", value: "Navy" }],
+    sizes: ["M", "L", "XL"],
+    variants: [{ type: "size", value: "M" }, { type: "size", value: "L" }, { type: "size", value: "XL" }],
+    minOrderQty: DEFAULT_MIN_ORDER_QTY,
+    maxOrderQty: DEFAULT_MAX_ORDER_QTY,
+    returnPolicy: DEFAULT_RETURN_POLICY,
     featured: true,
     active: true,
     createdAt: daysAgo(40),
@@ -104,7 +118,11 @@ export const mockProducts: Product[] = [
     categoryId: "cat-3",
     tags: ["accessories"],
     images: ["https://picsum.photos/seed/prod3/600/600"],
-    variants: [{ type: "color", value: "Black" }],
+    sizes: ["M"],
+    variants: [{ type: "size", value: "M" }],
+    minOrderQty: DEFAULT_MIN_ORDER_QTY,
+    maxOrderQty: 5,
+    returnPolicy: DEFAULT_RETURN_POLICY,
     featured: false,
     active: true,
     createdAt: daysAgo(20),
@@ -123,7 +141,11 @@ export const mockProducts: Product[] = [
     categoryId: "cat-4",
     tags: ["pants", "active"],
     images: ["https://picsum.photos/seed/prod4/600/600"],
+    sizes: ["S", "M"],
     variants: [{ type: "size", value: "S" }, { type: "size", value: "M" }],
+    minOrderQty: DEFAULT_MIN_ORDER_QTY,
+    maxOrderQty: DEFAULT_MAX_ORDER_QTY,
+    returnPolicy: DEFAULT_RETURN_POLICY,
     featured: false,
     active: true,
     createdAt: daysAgo(10),
@@ -141,7 +163,11 @@ export const mockProducts: Product[] = [
     categoryId: "cat-1",
     tags: ["vintage"],
     images: ["https://picsum.photos/seed/prod5/600/600"],
+    sizes: ["M", "L"],
     variants: [],
+    minOrderQty: DEFAULT_MIN_ORDER_QTY,
+    maxOrderQty: DEFAULT_MAX_ORDER_QTY,
+    returnPolicy: DEFAULT_RETURN_POLICY,
     featured: false,
     active: false,
     createdAt: daysAgo(70),
@@ -242,7 +268,8 @@ export const mockSettings: Settings = {
   freeShippingThreshold: 50,
   taxPercentage: 8,
   socialLinks: { facebook: "https://facebook.com/myroach", instagram: "https://instagram.com/myroach", twitter: "https://twitter.com/myroach" },
-  footerContent: "© 2026 MyRoach. All rights reserved.",
+  footerContent: "Gen Z streetwear for the underground. Built like a roach, dressed like a menace.",
+  footerConfig: { ...DEFAULT_FOOTER_CONFIG },
   policies: {
     returnPolicy: "30-day return policy on all items.",
     privacyPolicy: "We respect your privacy and protect your data.",
@@ -257,9 +284,14 @@ export const mockHomepage: HomepageContent = {
   promoTitle: "Summer Sale",
   promoSubtitle: "Up to 30% off selected items",
   showFeatured: true,
+  showFeaturedProducts: true,
+  featuredRotateSeconds: 5,
   showBestSellers: true,
   showNewArrivals: true,
   showPromo: true,
+  showShopTeaser: true,
+  showBrandStory: true,
+  showNewsletter: true,
 };
 
 // In-memory store for mock mutations

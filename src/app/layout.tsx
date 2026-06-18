@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { Toaster } from "sonner";
 import { AuthProvider } from "@/providers/auth-provider";
+import { AdminToaster } from "@/components/ui/admin-toaster";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         <AuthProvider>
           {children}
-          <Toaster position="top-right" richColors />
+          <AdminToaster />
         </AuthProvider>
       </body>
     </html>

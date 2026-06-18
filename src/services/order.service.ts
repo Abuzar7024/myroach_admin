@@ -1,5 +1,6 @@
-import { collection, doc, getDocs, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, updateDoc, Timestamp, onSnapshot } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
+import { runFirestoreWrite } from "@/lib/firestore-write";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toNumber, toString, toArray } from "@/lib/firestore-helpers";
 import { safeList, safeGet } from "@/lib/safe-async";
@@ -8,14 +9,27 @@ import type { Order, OrderStatus, PaymentStatus } from "@/types";
 
 const COL = "orders";
 
+function mapOrderItems(raw: unknown): Order["items"] {
+  const items = toArray<Record<string, unknown>>(raw);
+  return items.map((item) => ({
+    productId: toString(item.productId),
+    title: toString(item.title ?? item.name, "Item"),
+    quantity: toNumber(item.quantity, 1),
+    price: toNumber(item.price),
+    image: item.image != null ? toString(item.image) : undefined,
+  }));
+}
+
 function fromFirestore(id: string, data: Record<string, unknown>): Order {
   const shipping = (data.shippingAddress ?? data.shipping ?? data.address ?? {}) as Record<string, unknown>;
   return {
     id,
+    orderNumber: data.orderNumber != null ? toString(data.orderNumber) : undefined,
     userId: toString(data.userId ?? data.customerId),
     customerName: toString(data.customerName ?? shipping.name ?? data.name),
     customerEmail: toString(data.customerEmail ?? shipping.email ?? data.email),
-    items: toArray<Order["items"][0]>(data.items ?? data.lineItems ?? data.products),
+    customerPhone: toString(data.customerPhone ?? shipping.phone),
+    items: mapOrderItems(data.items ?? data.lineItems ?? data.products),
     subtotal: toNumber(data.subtotal),
     tax: toNumber(data.tax),
     shippingCharge: toNumber(data.shippingCharge ?? data.shipping ?? data.shippingCost),
@@ -31,8 +45,9 @@ function fromFirestore(id: string, data: Record<string, unknown>): Order {
       city: toString(shipping.city),
       state: toString(shipping.state),
       zip: toString(shipping.zip ?? shipping.postalCode),
-      country: toString(shipping.country, "IN"),
+      country: toString(shipping.country, "India"),
     },
+    trackingNumber: data.trackingNumber != null ? toString(data.trackingNumber) : undefined,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt ?? data.createdAt),
   };
@@ -53,6 +68,33 @@ export async function getOrders(): Promise<Order[]> {
   return safeList(fetchOrders, "orders");
 }
 
+/** Live order list for admin dashboard — updates when storefront places orders. */
+export function subscribeOrders(
+  onData: (orders: Order[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  if (USE_MOCK) {
+    onData([...mockStore.orders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+    return () => {};
+  }
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) {
+    onError?.(new Error("Firestore not initialized"));
+    return () => {};
+  }
+  return onSnapshot(
+    collection(db, COL),
+    (snap) => {
+      const orders = snap.docs
+        .map((d) => fromFirestore(d.id, d.data()))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onData(orders);
+    },
+    (err) => onError?.(err instanceof Error ? err : new Error(String(err)))
+  );
+}
+
 export async function getOrder(id: string): Promise<Order | null> {
   if (USE_MOCK) return mockStore.orders.find((o) => o.id === id) ?? null;
   return safeGet(async () => {
@@ -65,14 +107,72 @@ export async function getOrder(id: string): Promise<Order | null> {
   }, "order");
 }
 
+/** Live updates for a single order (status changes from admin or storefront). */
+export function subscribeOrder(
+  id: string,
+  onData: (order: Order | null) => void,
+  onError?: (error: Error) => void
+): () => void {
+  if (USE_MOCK) {
+    onData(mockStore.orders.find((o) => o.id === id) ?? null);
+    return () => {};
+  }
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) {
+    onError?.(new Error("Firestore not initialized"));
+    return () => {};
+  }
+  return onSnapshot(
+    doc(db, COL, id),
+    (snap) => onData(snap.exists() ? fromFirestore(snap.id, snap.data()) : null),
+    (err) => onError?.(err instanceof Error ? err : new Error(String(err)))
+  );
+}
+
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
   if (USE_MOCK) {
     const idx = mockStore.orders.findIndex((o) => o.id === id);
     if (idx >= 0) mockStore.orders[idx] = { ...mockStore.orders[idx], status, updatedAt: new Date() };
     return;
   }
-  initFirebase();
-  const db = getFirestoreDb();
-  if (!db) throw new Error("Firestore not initialized");
-  await updateDoc(doc(db, COL, id), { status, updatedAt: Timestamp.now() });
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await updateDoc(doc(db, COL, id), { status, updatedAt: Timestamp.now() });
+  });
+}
+
+export async function updateOrderPaymentStatus(id: string, paymentStatus: PaymentStatus): Promise<void> {
+  if (USE_MOCK) {
+    const idx = mockStore.orders.findIndex((o) => o.id === id);
+    if (idx >= 0) mockStore.orders[idx] = { ...mockStore.orders[idx], paymentStatus, updatedAt: new Date() };
+    return;
+  }
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await updateDoc(doc(db, COL, id), { paymentStatus, updatedAt: Timestamp.now() });
+  });
+}
+
+export async function updateOrderTracking(id: string, trackingNumber: string): Promise<void> {
+  if (USE_MOCK) {
+    const idx = mockStore.orders.findIndex((o) => o.id === id);
+    if (idx >= 0) {
+      mockStore.orders[idx] = {
+        ...mockStore.orders[idx],
+        trackingNumber,
+        status: mockStore.orders[idx].status === "delivered" ? "delivered" : "shipped",
+        updatedAt: new Date(),
+      };
+    }
+    return;
+  }
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await updateDoc(doc(db, COL, id), {
+      trackingNumber,
+      status: "shipped",
+      updatedAt: Timestamp.now(),
+    });
+  });
 }

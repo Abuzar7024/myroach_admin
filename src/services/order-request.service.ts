@@ -1,0 +1,172 @@
+import {
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  updateDoc,
+  where,
+  Timestamp,
+} from "firebase/firestore";
+import { getFirestoreDb, initFirebase } from "@/lib/firebase";
+import { runFirestoreWrite } from "@/lib/firestore-write";
+import { toDate, toNumber, toString } from "@/lib/firestore-helpers";
+import { USE_MOCK } from "@/lib/config";
+import {
+  renderOrderResponseMessage,
+  type OrderRequest,
+  type OrderRequestAdminResponse,
+  type OrderRequestStatus,
+  type OrderRequestType,
+  type OrderResponseTemplateKey,
+} from "@/lib/order-request";
+import { formatCurrency } from "@/lib/utils";
+
+const COL = "orderRequests";
+
+function mapAdminResponse(raw: unknown): OrderRequestAdminResponse | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const data = raw as Record<string, unknown>;
+  return {
+    templateKey: toString(data.templateKey) as OrderResponseTemplateKey,
+    message: toString(data.message),
+    refundDays: data.refundDays != null ? toNumber(data.refundDays) : undefined,
+    customNote: data.customNote != null ? toString(data.customNote) : undefined,
+    sentAt: toDate(data.sentAt).toISOString(),
+  };
+}
+
+function fromFirestore(id: string, data: Record<string, unknown>): OrderRequest {
+  return {
+    id,
+    orderId: toString(data.orderId),
+    orderNumber: toString(data.orderNumber),
+    userId: toString(data.userId),
+    customerName: toString(data.customerName),
+    customerEmail: data.customerEmail != null ? toString(data.customerEmail) : undefined,
+    orderTotal: toNumber(data.orderTotal),
+    type: toString(data.type, "cancel") as OrderRequestType,
+    status: toString(data.status, "pending") as OrderRequestStatus,
+    reason: toString(data.reason),
+    adminResponse: mapAdminResponse(data.adminResponse),
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt ?? data.createdAt),
+  };
+}
+
+export function subscribeOrderRequests(
+  onData: (requests: OrderRequest[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  if (USE_MOCK) {
+    onData([]);
+    return () => {};
+  }
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) {
+    onError?.(new Error("Firestore not initialized"));
+    return () => {};
+  }
+  return onSnapshot(
+    collection(db, COL),
+    (snap) => {
+      const requests = snap.docs
+        .map((d) => fromFirestore(d.id, d.data()))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onData(requests);
+    },
+    (err) => onError?.(err instanceof Error ? err : new Error(String(err)))
+  );
+}
+
+export function subscribeOrderRequestsForOrder(
+  orderId: string,
+  onData: (requests: OrderRequest[]) => void,
+  onError?: (error: Error) => void
+): () => void {
+  if (USE_MOCK) {
+    onData([]);
+    return () => {};
+  }
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) {
+    onError?.(new Error("Firestore not initialized"));
+    return () => {};
+  }
+  const q = query(collection(db, COL), where("orderId", "==", orderId));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const requests = snap.docs
+        .map((d) => fromFirestore(d.id, d.data()))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onData(requests);
+    },
+    (err) => onError?.(err instanceof Error ? err : new Error(String(err)))
+  );
+}
+
+export async function getPendingRequestCount(): Promise<number> {
+  if (USE_MOCK) return 0;
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) return 0;
+  const snap = await getDocs(query(collection(db, COL), where("status", "==", "pending")));
+  return snap.size;
+}
+
+export async function respondToOrderRequest(input: {
+  requestId: string;
+  orderId: string;
+  requestType: OrderRequestType;
+  decision: OrderRequestStatus;
+  templateKey: OrderResponseTemplateKey;
+  refundDays?: number;
+  customNote?: string;
+  orderTotal: number;
+}): Promise<void> {
+  if (USE_MOCK) return;
+
+  const message = renderOrderResponseMessage(input.templateKey, {
+    refundDays: input.refundDays,
+    customNote: input.customNote,
+    amount: formatCurrency(input.orderTotal),
+  });
+
+  const adminResponse: OrderRequestAdminResponse = {
+    templateKey: input.templateKey,
+    message,
+    refundDays: input.refundDays,
+    customNote: input.customNote?.trim() || undefined,
+    sentAt: new Date().toISOString(),
+  };
+
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await updateDoc(doc(db, COL, input.requestId), {
+      status: input.decision,
+      adminResponse: {
+        ...adminResponse,
+        sentAt: Timestamp.now(),
+      },
+      updatedAt: Timestamp.now(),
+    });
+
+    if (input.decision === "approved") {
+      if (input.requestType === "cancel") {
+        await updateDoc(doc(db, "orders", input.orderId), {
+          status: "cancelled",
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        await updateDoc(doc(db, "orders", input.orderId), {
+          status: "refunded",
+          paymentStatus: "refunded",
+          updatedAt: Timestamp.now(),
+        });
+      }
+    }
+  });
+}

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 import { DashboardHeader } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { FooterEditor } from "@/components/settings/footer-editor";
+import { mergeFooterConfig } from "@/lib/footer-config";
+import { runSave } from "@/lib/save-action";
 import { getSettings, updateSettings, getHomepageContent, updateHomepageContent } from "@/services/settings.service";
 import type { Settings, HomepageContent } from "@/types";
 
@@ -28,16 +30,26 @@ export default function SettingsPage() {
   async function saveSettings() {
     if (!settings) return;
     setSaving(true);
-    await updateSettings(settings);
-    toast.success("Settings saved");
+    await runSave(
+      () => updateSettings(settings),
+      {
+        successMessage: "Settings saved",
+        onSuccess: async () => setSettings(await getSettings()),
+      }
+    );
     setSaving(false);
   }
 
   async function saveHomepage() {
     if (!homepage) return;
     setSaving(true);
-    await updateHomepageContent(homepage);
-    toast.success("Homepage content saved");
+    await runSave(
+      () => updateHomepageContent(homepage),
+      {
+        successMessage: "Homepage content saved",
+        onSuccess: async () => setHomepage(await getHomepageContent()),
+      }
+    );
     setSaving(false);
   }
 
@@ -88,12 +100,43 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
+          <CardHeader><CardTitle>Shipping integration</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm text-zinc-600">
+            <p>
+              Connect <strong>Shiprocket</strong> on the storefront (Vercel) with environment variables:
+            </p>
+            <code className="block rounded bg-zinc-100 p-2 text-xs">SHIPROCKET_EMAIL</code>
+            <code className="mt-1 block rounded bg-zinc-100 p-2 text-xs">SHIPROCKET_PASSWORD</code>
+            <code className="mt-1 block rounded bg-zinc-100 p-2 text-xs">SHIPROCKET_PICKUP_PINCODE</code>
+            <p className="pt-1">Shoppers get live courier rates at checkout after entering pincode. Without credentials, static shipping rates apply.</p>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Footer</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Brand tagline</Label>
+              <Textarea
+                value={settings.footerContent}
+                onChange={(e) => setSettings({ ...settings, footerContent: e.target.value })}
+                placeholder="Short line under the logo on the storefront footer"
+              />
+            </div>
+            <FooterEditor
+              value={mergeFooterConfig(settings.footerConfig)}
+              onChange={(footerConfig) => setSettings({ ...settings, footerConfig })}
+            />
+            <Button onClick={saveSettings} disabled={saving}>Save Footer</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle>Policies</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div><Label>Return Policy</Label><Textarea value={settings.policies.returnPolicy ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, returnPolicy: e.target.value } })} /></div>
             <div><Label>Privacy Policy</Label><Textarea value={settings.policies.privacyPolicy ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, privacyPolicy: e.target.value } })} /></div>
             <div><Label>Terms</Label><Textarea value={settings.policies.termsAndConditions ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, termsAndConditions: e.target.value } })} /></div>
-            <div><Label>Footer</Label><Textarea value={settings.footerContent} onChange={(e) => setSettings({ ...settings, footerContent: e.target.value })} /></div>
             <Button onClick={saveSettings} disabled={saving}>Save Policies</Button>
           </CardContent>
         </Card>
@@ -108,6 +151,9 @@ export default function SettingsPage() {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showBestSellers} onChange={(e) => setHomepage({ ...homepage, showBestSellers: e.target.checked })} /> Show Best Sellers</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showNewArrivals} onChange={(e) => setHomepage({ ...homepage, showNewArrivals: e.target.checked })} /> Show New Arrivals</label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showPromo} onChange={(e) => setHomepage({ ...homepage, showPromo: e.target.checked })} /> Show Promo</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showShopTeaser ?? true} onChange={(e) => setHomepage({ ...homepage, showShopTeaser: e.target.checked })} /> Shop Teaser</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showBrandStory ?? true} onChange={(e) => setHomepage({ ...homepage, showBrandStory: e.target.checked })} /> Brand Story</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={homepage.showNewsletter ?? true} onChange={(e) => setHomepage({ ...homepage, showNewsletter: e.target.checked })} /> Newsletter</label>
             </div>
             <Button onClick={saveHomepage} disabled={saving}>Save Homepage</Button>
           </CardContent>

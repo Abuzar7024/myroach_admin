@@ -21,27 +21,6 @@ const BOOTSTRAP_ADMIN_EMAIL = "admin@gmail.com";
 const BOOTSTRAP_ADMIN_PASSWORD = "admin@123";
 const DEV_BYPASS_UID = "dev-bypass-admin";
 
-function getDevBypassUser(): User {
-  return {
-    uid: DEV_BYPASS_UID,
-    name: "Dev Admin",
-    email: BOOTSTRAP_ADMIN_EMAIL,
-    role: "admin",
-    active: true,
-    createdAt: new Date(),
-  };
-}
-
-/** Temporary dev-only entry without Firebase. Remove before production. */
-export function bypassLogin(): User {
-  if (process.env.NODE_ENV !== "development") {
-    throw new Error("Bypass login is only available in development");
-  }
-  const user = getDevBypassUser();
-  setSessionCookie(DEV_BYPASS_UID);
-  return user;
-}
-
 function isFirestoreOfflineError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const code = (err as { code?: string }).code ?? "";
@@ -86,7 +65,11 @@ async function ensureAdminProfile(uid: string, email: string) {
   }
   const data = snap.data();
   if (data.role !== "admin") {
-    await firestoreSetDoc(ref, { role: "admin", active: true }, { merge: true });
+    await firestoreSetDoc(
+      ref,
+      { role: "admin", active: true, email, name: data.name ?? "Admin" },
+      { merge: true }
+    );
   }
 }
 
@@ -126,7 +109,7 @@ function firebaseAuthErrorMessage(code: string): string {
     case "auth/network-request-failed":
       return "Network error. Check your internet connection.";
     case "permission-denied":
-      return "Firestore permission denied. Deploy firestore.rules: firebase deploy --only firestore:rules";
+      return "Firestore permission denied. Deploy rules (firebase deploy --only firestore:rules,storage), then ensure Firestore users/{your-uid} has role: \"admin\".";
     case "unavailable":
       return "Cannot reach Firestore (client offline). Register your App Check debug token in Firebase Console → App Check → Manage debug tokens, or disable App Check enforcement for Firestore during development.";
     default:
@@ -223,8 +206,9 @@ export function getSessionUid(): string | null {
 
 export async function getCurrentUser(): Promise<User | null> {
   const sessionUid = getSessionUid();
-  if (sessionUid === DEV_BYPASS_UID && process.env.NODE_ENV === "development") {
-    return getDevBypassUser();
+  if (sessionUid === DEV_BYPASS_UID) {
+    clearSessionCookie();
+    return null;
   }
 
   if (USE_MOCK) {
