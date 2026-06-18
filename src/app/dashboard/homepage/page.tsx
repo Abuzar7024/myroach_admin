@@ -7,11 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
+import { FeaturedCollectionScheduler } from "@/components/homepage/featured-collection-scheduler";
 import { STORE_URL } from "@/lib/utils";
 import { runSave } from "@/lib/save-action";
 import { getHomepageContent, updateHomepageContent } from "@/services/settings.service";
 import { getProducts } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
+import {
+  MAX_FEATURED_ROTATE_SECONDS,
+  resolveActiveFeaturedCollectionIds,
+  schedulesFromLegacyIds,
+} from "@/lib/featured-collection-schedule";
 import type { HomepageContent, Product, Category } from "@/types";
 
 export default function HomepagePage() {
@@ -23,7 +29,13 @@ export default function HomepagePage() {
 
   useEffect(() => {
     Promise.all([getHomepageContent(), getProducts(), getCategories()]).then(([h, p, c]) => {
-      setHomepage(h);
+      const schedules =
+        h.featuredCollectionSchedules?.length
+          ? h.featuredCollectionSchedules
+          : h.featuredCollectionIds.length
+            ? schedulesFromLegacyIds(h.featuredCollectionIds)
+            : [];
+      setHomepage({ ...h, featuredCollectionSchedules: schedules });
       setProducts(p.filter((x) => x.active));
       setCategories(c.filter((x) => x.active));
       setLoading(false);
@@ -33,8 +45,21 @@ export default function HomepagePage() {
   async function save() {
     if (!homepage) return;
     setSaving(true);
+    const schedules = homepage.featuredCollectionSchedules ?? [];
+    const payload: HomepageContent = {
+      ...homepage,
+      featuredCollectionSchedules: schedules,
+      featuredCollectionIds: resolveActiveFeaturedCollectionIds(
+        schedules,
+        homepage.featuredCollectionIds
+      ),
+      featuredRotateSeconds: Math.max(
+        3,
+        Math.min(MAX_FEATURED_ROTATE_SECONDS, homepage.featuredRotateSeconds ?? 5)
+      ),
+    };
     await runSave(
-      () => updateHomepageContent(homepage),
+      () => updateHomepageContent(payload),
       {
         successMessage: "Homepage updated — changes reflect on live store",
         onSuccess: async () => setHomepage(await getHomepageContent()),
@@ -101,19 +126,22 @@ export default function HomepagePage() {
           <CardHeader><CardTitle>Featured Products</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <p className="text-xs text-zinc-500">
-              Products marked &quot;Featured&quot; in Products appear on the storefront — 3 at a time.
+              Mark products as Featured on the product page. The carousel shows 3 at a time.
             </p>
             <div>
-              <Label>Default rotation time (seconds)</Label>
+              <Label>Carousel speed (seconds, max {MAX_FEATURED_ROTATE_SECONDS})</Label>
               <Input
                 type="number"
                 min={3}
-                max={60}
+                max={MAX_FEATURED_ROTATE_SECONDS}
                 value={homepage.featuredRotateSeconds ?? 5}
                 onChange={(e) =>
                   setHomepage({
                     ...homepage,
-                    featuredRotateSeconds: Math.max(3, Math.min(60, Number(e.target.value) || 5)),
+                    featuredRotateSeconds: Math.max(
+                      3,
+                      Math.min(MAX_FEATURED_ROTATE_SECONDS, Number(e.target.value) || 5)
+                    ),
                   })
                 }
               />
@@ -127,7 +155,9 @@ export default function HomepagePage() {
                   .map((p) => (
                     <div key={p.id} className="flex items-center justify-between text-sm">
                       <span>{p.title}</span>
-                      <span className="text-zinc-500">{p.featuredDisplaySeconds ?? homepage.featuredRotateSeconds ?? 5}s</span>
+                      <span className="text-zinc-500">
+                        {p.featuredDisplaySeconds ?? homepage.featuredRotateSeconds ?? 5}s
+                      </span>
                     </div>
                   ))
               )}
@@ -136,18 +166,15 @@ export default function HomepagePage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Featured Collections</CardTitle></CardHeader>
-          <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-            {categories.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={homepage.featuredCollectionIds.includes(c.id)}
-                  onChange={() => setHomepage({ ...homepage, featuredCollectionIds: toggleId(homepage.featuredCollectionIds, c.id) })}
-                />
-                {c.name}
-              </label>
-            ))}
+          <CardHeader><CardTitle>Featured Collections Calendar</CardTitle></CardHeader>
+          <CardContent>
+            <FeaturedCollectionScheduler
+              categories={categories}
+              schedules={homepage.featuredCollectionSchedules ?? []}
+              onChange={(featuredCollectionSchedules) =>
+                setHomepage({ ...homepage, featuredCollectionSchedules })
+              }
+            />
           </CardContent>
         </Card>
 

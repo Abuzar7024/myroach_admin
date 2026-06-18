@@ -135,7 +135,7 @@ export default function CreateProductPage() {
           returnPolicy: data.returnPolicy.trim() || DEFAULT_RETURN_POLICY,
           featured: data.featured,
           featuredDisplaySeconds: data.featured
-            ? Math.max(3, Math.min(60, data.featuredDisplaySeconds ?? 5))
+            ? Math.max(3, Math.min(40, data.featuredDisplaySeconds ?? 5))
             : undefined,
           active: data.active,
         }),
@@ -245,7 +245,7 @@ export default function CreateProductPage() {
                   <Input
                     type="number"
                     min={3}
-                    max={60}
+                    max={40}
                     className="w-24"
                     {...register("featuredDisplaySeconds", { valueAsNumber: true })}
                   />

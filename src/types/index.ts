@@ -135,8 +135,15 @@ export interface Banner {
   active: boolean;
 }
 
+export interface FeaturedCollectionSchedule {
+  categoryId: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface HomepageContent {
   featuredCollectionIds: string[];
+  featuredCollectionSchedules?: FeaturedCollectionSchedule[];
   bestSellerIds: string[];
   newArrivalIds: string[];
   promoTitle: string;
