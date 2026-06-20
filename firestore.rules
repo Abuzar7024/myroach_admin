@@ -25,7 +25,7 @@ service cloud.firestore {
     }
 
     function isBootstrapAdminEmail() {
-      return request.auth.token.email == 'admin@gmail.com';
+      return request.auth.token.email in ['admin@gmail.com', 'admin@myroach.in'];
     }
 
     match /users/{userId} {

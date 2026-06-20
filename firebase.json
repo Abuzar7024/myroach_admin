@@ -5,5 +5,16 @@
   },
   "storage": {
     "rules": "storage.rules"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true
+    },
+    "authorizedDomains": [
+      "localhost",
+      "myroach.vercel.app",
+      "myroach-34ws.vercel.app",
+      "myroach-admin.vercel.app"
+    ]
   }
 }

@@ -1,5 +1,5 @@
 export const STORE_URL =
-  process.env.NEXT_PUBLIC_STORE_URL ?? "https://myroach-34ws.vercel.app";
+  process.env.NEXT_PUBLIC_STORE_URL ?? "https://myroach.vercel.app";
 
 export const CURRENCY = process.env.NEXT_PUBLIC_CURRENCY ?? "INR";
 

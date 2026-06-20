@@ -17,7 +17,7 @@ import { USE_MOCK } from "@/lib/config";
 import type { User, UserRole } from "@/types";
 
 const SESSION_COOKIE = "admin_session";
-const BOOTSTRAP_ADMIN_EMAIL = "admin@gmail.com";
+const BOOTSTRAP_ADMIN_EMAILS = ["admin@gmail.com", "admin@myroach.in"];
 const BOOTSTRAP_ADMIN_PASSWORD = "admin@123";
 const DEV_BYPASS_UID = "dev-bypass-admin";
 const BOOTSTRAP_ENABLED =
@@ -145,7 +145,7 @@ export async function login(email: string, password: string): Promise<User> {
 
   const isBootstrap =
     BOOTSTRAP_ENABLED &&
-    normalizedEmail === BOOTSTRAP_ADMIN_EMAIL &&
+    BOOTSTRAP_ADMIN_EMAILS.includes(normalizedEmail) &&
     password === BOOTSTRAP_ADMIN_PASSWORD;
 
   try {
@@ -246,8 +246,13 @@ export async function getCurrentUser(): Promise<User | null> {
     const userDocRef = doc(firestore, "users", fbUser.uid);
     let userDoc = await firestoreGetDoc(userDocRef);
 
-    if (!userDoc.exists() && BOOTSTRAP_ENABLED && fbUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL) {
-      await ensureAdminProfile(fbUser.uid, BOOTSTRAP_ADMIN_EMAIL);
+    if (
+      !userDoc.exists() &&
+      BOOTSTRAP_ENABLED &&
+      fbUser.email &&
+      BOOTSTRAP_ADMIN_EMAILS.includes(fbUser.email.toLowerCase())
+    ) {
+      await ensureAdminProfile(fbUser.uid, fbUser.email.toLowerCase());
       userDoc = await firestoreGetDoc(userDocRef);
     }
 
