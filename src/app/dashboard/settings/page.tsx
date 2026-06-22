@@ -11,6 +11,8 @@ import { FooterEditor } from "@/components/settings/footer-editor";
 import { mergeFooterConfig } from "@/lib/footer-config";
 import { runSave } from "@/lib/save-action";
 import { getSettings, updateSettings, getHomepageContent, updateHomepageContent } from "@/services/settings.service";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
+import { storePage, STOREFRONT_PATHS } from "@/lib/storefront-links";
 import type { Settings, HomepageContent } from "@/types";
 
 export default function SettingsPage() {
@@ -27,29 +29,28 @@ export default function SettingsPage() {
     });
   }, []);
 
-  async function saveSettings() {
+  async function saveSettings(
+    successMessage: string,
+    storefrontHref: string = storePage(STOREFRONT_PATHS.home)
+  ) {
     if (!settings) return;
     setSaving(true);
-    await runSave(
-      () => updateSettings(settings),
-      {
-        successMessage: "Settings saved",
-        onSuccess: async () => setSettings(await getSettings()),
-      }
-    );
+    await runSave(() => updateSettings(settings), {
+      successMessage,
+      storefrontHref,
+      onSuccess: async () => setSettings(await getSettings()),
+    });
     setSaving(false);
   }
 
   async function saveHomepage() {
     if (!homepage) return;
     setSaving(true);
-    await runSave(
-      () => updateHomepageContent(homepage),
-      {
-        successMessage: "Homepage content saved",
-        onSuccess: async () => setHomepage(await getHomepageContent()),
-      }
-    );
+    await runSave(() => updateHomepageContent(homepage), {
+      successMessage: "Homepage content saved",
+      storefrontHref: storePage(STOREFRONT_PATHS.home),
+      onSuccess: async () => setHomepage(await getHomepageContent()),
+    });
     setSaving(false);
   }
 
@@ -75,17 +76,48 @@ export default function SettingsPage() {
             <div><Label>Email</Label><Input value={settings.contactEmail} onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })} /></div>
             <div><Label>Phone</Label><Input value={settings.phone} onChange={(e) => setSettings({ ...settings, phone: e.target.value })} /></div>
             <div><Label>Address</Label><Textarea value={settings.address} onChange={(e) => setSettings({ ...settings, address: e.target.value })} /></div>
-            <Button onClick={saveSettings} disabled={saving}>Save General</Button>
+            <Button onClick={() => saveSettings("General settings saved")} disabled={saving}>
+              Save General
+            </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>Shipping & Tax</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div><Label>Shipping Charge</Label><Input type="number" step="0.01" value={settings.shippingCharge} onChange={(e) => setSettings({ ...settings, shippingCharge: Number(e.target.value) })} /></div>
-            <div><Label>Free Shipping Threshold</Label><Input type="number" step="0.01" value={settings.freeShippingThreshold} onChange={(e) => setSettings({ ...settings, freeShippingThreshold: Number(e.target.value) })} /></div>
-            <div><Label>Tax Percentage</Label><Input type="number" value={settings.taxPercentage} onChange={(e) => setSettings({ ...settings, taxPercentage: Number(e.target.value) })} /></div>
-            <Button onClick={saveSettings} disabled={saving}>Save Shipping & Tax</Button>
+            <div>
+              <Label>Shipping Charge</Label>
+              <OptionalNumberInput
+                step={0.01}
+                value={settings.shippingCharge}
+                onChange={(shippingCharge) => setSettings({ ...settings, shippingCharge })}
+              />
+            </div>
+            <div>
+              <Label>Free Shipping Threshold</Label>
+              <OptionalNumberInput
+                step={0.01}
+                value={settings.freeShippingThreshold}
+                onChange={(freeShippingThreshold) =>
+                  setSettings({ ...settings, freeShippingThreshold })
+                }
+              />
+            </div>
+            <div>
+              <Label>Tax Percentage</Label>
+              <OptionalNumberInput
+                value={settings.taxPercentage}
+                onChange={(taxPercentage) => setSettings({ ...settings, taxPercentage })}
+              />
+            </div>
+            <Button
+              onClick={() =>
+                saveSettings("Shipping & tax saved", storePage(STOREFRONT_PATHS.shippingReturns))
+              }
+              disabled={saving}
+            >
+              Save Shipping & Tax
+            </Button>
           </CardContent>
         </Card>
 
@@ -95,7 +127,9 @@ export default function SettingsPage() {
             <div><Label>Facebook</Label><Input value={settings.socialLinks.facebook ?? ""} onChange={(e) => setSettings({ ...settings, socialLinks: { ...settings.socialLinks, facebook: e.target.value } })} /></div>
             <div><Label>Instagram</Label><Input value={settings.socialLinks.instagram ?? ""} onChange={(e) => setSettings({ ...settings, socialLinks: { ...settings.socialLinks, instagram: e.target.value } })} /></div>
             <div><Label>Twitter</Label><Input value={settings.socialLinks.twitter ?? ""} onChange={(e) => setSettings({ ...settings, socialLinks: { ...settings.socialLinks, twitter: e.target.value } })} /></div>
-            <Button onClick={saveSettings} disabled={saving}>Save Social</Button>
+            <Button onClick={() => saveSettings("Social links saved")} disabled={saving}>
+              Save Social
+            </Button>
           </CardContent>
         </Card>
 
@@ -127,17 +161,84 @@ export default function SettingsPage() {
               value={mergeFooterConfig(settings.footerConfig)}
               onChange={(footerConfig) => setSettings({ ...settings, footerConfig })}
             />
-            <Button onClick={saveSettings} disabled={saving}>Save Footer</Button>
+            <Button onClick={() => saveSettings("Footer saved")} disabled={saving}>
+              Save Footer
+            </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader><CardTitle>Policies</CardTitle></CardHeader>
           <CardContent className="space-y-3">
-            <div><Label>Return Policy</Label><Textarea value={settings.policies.returnPolicy ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, returnPolicy: e.target.value } })} /></div>
-            <div><Label>Privacy Policy</Label><Textarea value={settings.policies.privacyPolicy ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, privacyPolicy: e.target.value } })} /></div>
-            <div><Label>Terms</Label><Textarea value={settings.policies.termsAndConditions ?? ""} onChange={(e) => setSettings({ ...settings, policies: { ...settings.policies, termsAndConditions: e.target.value } })} /></div>
-            <Button onClick={saveSettings} disabled={saving}>Save Policies</Button>
+            <div>
+              <Label>Return Policy</Label>
+              <Textarea
+                value={settings.policies.returnPolicy ?? ""}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    policies: { ...settings.policies, returnPolicy: e.target.value },
+                  })
+                }
+              />
+              <Button
+                className="mt-2"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  saveSettings("Return policy saved", storePage(STOREFRONT_PATHS.shippingReturns))
+                }
+                disabled={saving}
+              >
+                Save & preview returns page
+              </Button>
+            </div>
+            <div>
+              <Label>Privacy Policy</Label>
+              <Textarea
+                value={settings.policies.privacyPolicy ?? ""}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    policies: { ...settings.policies, privacyPolicy: e.target.value },
+                  })
+                }
+              />
+              <Button
+                className="mt-2"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  saveSettings("Privacy policy saved", storePage(STOREFRONT_PATHS.privacy))
+                }
+                disabled={saving}
+              >
+                Save & preview privacy page
+              </Button>
+            </div>
+            <div>
+              <Label>Terms</Label>
+              <Textarea
+                value={settings.policies.termsAndConditions ?? ""}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    policies: { ...settings.policies, termsAndConditions: e.target.value },
+                  })
+                }
+              />
+              <Button
+                className="mt-2"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  saveSettings("Terms saved", storePage(STOREFRONT_PATHS.terms))
+                }
+                disabled={saving}
+              >
+                Save & preview terms page
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

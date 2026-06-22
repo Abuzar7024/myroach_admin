@@ -11,6 +11,8 @@ import { PageLoader } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { runSave } from "@/lib/save-action";
+import { storePage, STOREFRONT_PATHS } from "@/lib/storefront-links";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
 import { getCoupons, createCoupon, updateCoupon, deleteCoupon } from "@/services/coupon.service";
 import type { Coupon } from "@/types";
 
@@ -18,7 +20,13 @@ export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<{ code: string; discountType: "percentage" | "fixed"; discountValue: number; minimumOrderAmount: number; usageLimit: number }>({ code: "", discountType: "percentage", discountValue: 10, minimumOrderAmount: 0, usageLimit: 100 });
+  const [form, setForm] = useState<{
+    code: string;
+    discountType: "percentage" | "fixed";
+    discountValue?: number;
+    minimumOrderAmount?: number;
+    usageLimit?: number;
+  }>({ code: "", discountType: "percentage", discountValue: 10, minimumOrderAmount: undefined, usageLimit: 100 });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { getCoupons().then((c) => { setCoupons(c); setLoading(false); }); }, []);
@@ -27,9 +35,18 @@ export default function CouponsPage() {
     if (!form.code) return;
     setSaving(true);
     await runSave(
-      () => createCoupon({ ...form, expiryDate: new Date(Date.now() + 30 * 86400000), active: true }),
+      () =>
+        createCoupon({
+          ...form,
+          discountValue: form.discountValue ?? 0,
+          minimumOrderAmount: form.minimumOrderAmount ?? 0,
+          usageLimit: form.usageLimit ?? 100,
+          expiryDate: new Date(Date.now() + 30 * 86400000),
+          active: true,
+        }),
       {
         successMessage: "Coupon created",
+        storefrontHref: storePage(STOREFRONT_PATHS.shop),
         onSuccess: async () => {
           setCoupons(await getCoupons());
           setShowForm(false);
@@ -52,8 +69,20 @@ export default function CouponsPage() {
         <div className="mb-4 grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-2">
           <div><Label>Code</Label><Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} /></div>
           <div><Label>Type</Label><Select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value as "percentage" | "fixed" })}><option value="percentage">Percentage</option><option value="fixed">Fixed</option></Select></div>
-          <div><Label>Value</Label><Input type="number" value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: Number(e.target.value) })} /></div>
-          <div><Label>Min Order</Label><Input type="number" value={form.minimumOrderAmount} onChange={(e) => setForm({ ...form, minimumOrderAmount: Number(e.target.value) })} /></div>
+          <div>
+            <Label>Value</Label>
+            <OptionalNumberInput
+              value={form.discountValue}
+              onChange={(discountValue) => setForm({ ...form, discountValue })}
+            />
+          </div>
+          <div>
+            <Label>Min Order</Label>
+            <OptionalNumberInput
+              value={form.minimumOrderAmount}
+              onChange={(minimumOrderAmount) => setForm({ ...form, minimumOrderAmount })}
+            />
+          </div>
           <div className="flex gap-2 md:col-span-2"><Button onClick={handleCreate} disabled={saving}>{saving ? "Saving..." : "Create"}</Button><Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button></div>
         </div>
       )}

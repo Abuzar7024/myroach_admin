@@ -168,9 +168,9 @@ export interface Settings {
   contactEmail: string;
   phone: string;
   address: string;
-  shippingCharge: number;
-  freeShippingThreshold: number;
-  taxPercentage: number;
+  shippingCharge?: number;
+  freeShippingThreshold?: number;
+  taxPercentage?: number;
   socialLinks: {
     facebook?: string;
     instagram?: string;

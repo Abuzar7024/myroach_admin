@@ -56,6 +56,8 @@ export function storeCategoryUrl(slug: string) {
   return `${STORE_URL}/collections/${slug}`;
 }
 
+export { storePage, storeProductPath, storeCollectionPath, STOREFRONT_PATHS } from "./storefront-links";
+
 /** Hostname shown next to admin “open store” links (e.g. myroach.vercel.app). */
 export function storeUrlHost() {
   try {

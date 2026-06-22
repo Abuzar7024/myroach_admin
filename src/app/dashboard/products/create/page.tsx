@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MultiImageUpload } from "@/components/ui/image-upload";
 import { SizePicker } from "@/components/ui/size-picker";
 import { PageLoader } from "@/components/ui/skeleton";
-import { slugify } from "@/lib/utils";
+import { slugify, storeProductUrl } from "@/lib/utils";
 import {
   GENDER_OPTIONS,
   DEFAULT_MAX_ORDER_QTY,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/catalog";
 import { normalizePrice } from "@/lib/money";
 import { runSave } from "@/lib/save-action";
+import { setValueAsOptionalNumber } from "@/lib/form-number";
 import { useFormDraft } from "@/hooks/use-form-draft";
 import { createProduct } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
@@ -113,11 +114,12 @@ export default function CreateProductPage() {
         : undefined;
 
     const category = categories.find((c) => c.id === data.categoryId);
+    const slug = slugify(data.title);
     const saved = await runSave(
       () =>
         createProduct({
           title: data.title,
-          slug: slugify(data.title),
+          slug,
           description: data.description,
           shortDescription: data.shortDescription,
           price,
@@ -139,7 +141,10 @@ export default function CreateProductPage() {
             : undefined,
           active: data.active,
         }),
-      { successMessage: "Product created — live on storefront via Firestore `products`" }
+      {
+        successMessage: "Product created — live on storefront via Firestore `products`",
+        storefrontHref: storeProductUrl(slug),
+      }
     );
     if (saved) {
       clearDraft();
@@ -219,16 +224,28 @@ export default function CreateProductPage() {
             />
             <div className="space-y-2">
               <Label>Inventory (stock) *</Label>
-              <Input type="number" min={0} {...register("stock", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={0}
+                {...register("stock", { setValueAs: setValueAsOptionalNumber, required: true })}
+              />
               <p className="text-xs text-zinc-500">Total units — update anytime in Inventory</p>
             </div>
             <div className="space-y-2">
               <Label>Min qty per order</Label>
-              <Input type="number" min={1} {...register("minOrderQty", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={1}
+                {...register("minOrderQty", { setValueAs: setValueAsOptionalNumber })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Max qty per order</Label>
-              <Input type="number" min={1} {...register("maxOrderQty", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={1}
+                {...register("maxOrderQty", { setValueAs: setValueAsOptionalNumber })}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Return policy (shown on product page)</Label>
@@ -247,7 +264,7 @@ export default function CreateProductPage() {
                     min={3}
                     max={40}
                     className="w-24"
-                    {...register("featuredDisplaySeconds", { valueAsNumber: true })}
+                    {...register("featuredDisplaySeconds", { setValueAs: setValueAsOptionalNumber })}
                   />
                 </div>
               )}

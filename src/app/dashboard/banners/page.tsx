@@ -12,11 +12,20 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
 import { runSave } from "@/lib/save-action";
+import { storePage, STOREFRONT_PATHS } from "@/lib/storefront-links";
 import { getBanners, createBanner, updateBanner, deleteBanner } from "@/services/banner.service";
 import type { Banner } from "@/types";
 
 const emptyForm = { title: "", subtitle: "", redirectUrl: "", position: 1, image: "" };
+
+function bannerStorefrontUrl(redirectUrl: string) {
+  const path = redirectUrl.trim();
+  if (!path) return storePage(STOREFRONT_PATHS.home);
+  if (/^https?:\/\//i.test(path)) return path;
+  return storePage(path);
+}
 
 export default function BannersPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -40,6 +49,7 @@ export default function BannersPage() {
         () => updateBanner(editId, form),
         {
           successMessage: "Banner updated — live on storefront when site reads `banners` collection",
+          storefrontHref: bannerStorefrontUrl(form.redirectUrl),
           onSuccess: async () => {
             setBanners(await getBanners());
             setShowForm(false);
@@ -53,6 +63,7 @@ export default function BannersPage() {
         () => createBanner({ ...form, active: true }),
         {
           successMessage: "Banner created",
+          storefrontHref: bannerStorefrontUrl(form.redirectUrl),
           onSuccess: async () => {
             setBanners(await getBanners());
             setShowForm(false);
@@ -81,7 +92,13 @@ export default function BannersPage() {
           <div><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
           <div><Label>Subtitle</Label><Input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} /></div>
           <div><Label>Redirect URL</Label><Input value={form.redirectUrl} onChange={(e) => setForm({ ...form, redirectUrl: e.target.value })} placeholder="/collections/sale" /></div>
-          <div><Label>Position</Label><Input type="number" value={form.position} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} /></div>
+          <div>
+            <Label>Position</Label>
+            <OptionalNumberInput
+              value={form.position}
+              onChange={(position) => setForm({ ...form, position: position ?? 1 })}
+            />
+          </div>
           <div className="md:col-span-2">
             <ImageUpload
               label="Banner image (1200×400 recommended)"

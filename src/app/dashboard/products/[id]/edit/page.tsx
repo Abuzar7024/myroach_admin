@@ -20,6 +20,8 @@ import {
   DEFAULT_RETURN_POLICY,
 } from "@/lib/catalog";
 import { runSave } from "@/lib/save-action";
+import { setValueAsOptionalNumber } from "@/lib/form-number";
+import { storeProductUrl, slugify } from "@/lib/utils";
 import { getProduct, updateProduct } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
 import type { CatalogGender, Category } from "@/types";
@@ -136,7 +138,7 @@ export default function EditProductPage() {
             : undefined,
           active: data.active,
         }),
-      { successMessage: "Product updated" }
+      { successMessage: "Product updated", storefrontHref: storeProductUrl(slugify(data.title)) }
     );
     if (saved !== null) router.push("/dashboard/products");
   }
@@ -184,15 +186,27 @@ export default function EditProductPage() {
             />
             <div className="space-y-2">
               <Label>Inventory (stock)</Label>
-              <Input type="number" min={0} {...register("stock", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={0}
+                {...register("stock", { setValueAs: setValueAsOptionalNumber, required: true })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Min qty per order</Label>
-              <Input type="number" min={1} {...register("minOrderQty", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={1}
+                {...register("minOrderQty", { setValueAs: setValueAsOptionalNumber })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Max qty per order</Label>
-              <Input type="number" min={1} {...register("maxOrderQty", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={1}
+                {...register("maxOrderQty", { setValueAs: setValueAsOptionalNumber })}
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Return policy</Label>
@@ -211,7 +225,7 @@ export default function EditProductPage() {
                     min={3}
                     max={40}
                     className="w-24"
-                    {...register("featuredDisplaySeconds", { valueAsNumber: true })}
+                    {...register("featuredDisplaySeconds", { setValueAs: setValueAsOptionalNumber })}
                   />
                 </div>
               )}

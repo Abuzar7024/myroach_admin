@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
+import { OptionalNumberInput } from "@/components/ui/optional-number-input";
 import { FeaturedCollectionScheduler } from "@/components/homepage/featured-collection-scheduler";
 import { StoreOpenLink } from "@/components/layout/store-open-link";
+import { storePage, STOREFRONT_PATHS } from "@/lib/storefront-links";
 import { runSave } from "@/lib/save-action";
 import { getHomepageContent, updateHomepageContent } from "@/services/settings.service";
 import { getProducts } from "@/services/product.service";
@@ -61,6 +63,7 @@ export default function HomepagePage() {
       () => updateHomepageContent(payload),
       {
         successMessage: "Homepage updated — changes reflect on live store",
+        storefrontHref: storePage(STOREFRONT_PATHS.home),
         onSuccess: async () => setHomepage(await getHomepageContent()),
       }
     );
@@ -123,18 +126,17 @@ export default function HomepagePage() {
             </p>
             <div>
               <Label>Carousel speed (seconds, max {MAX_FEATURED_ROTATE_SECONDS})</Label>
-              <Input
-                type="number"
+              <OptionalNumberInput
                 min={3}
                 max={MAX_FEATURED_ROTATE_SECONDS}
-                value={homepage.featuredRotateSeconds ?? 5}
-                onChange={(e) =>
+                value={homepage.featuredRotateSeconds}
+                onChange={(featuredRotateSeconds) =>
                   setHomepage({
                     ...homepage,
-                    featuredRotateSeconds: Math.max(
-                      3,
-                      Math.min(MAX_FEATURED_ROTATE_SECONDS, Number(e.target.value) || 5)
-                    ),
+                    featuredRotateSeconds:
+                      featuredRotateSeconds == null
+                        ? 5
+                        : Math.max(3, Math.min(MAX_FEATURED_ROTATE_SECONDS, featuredRotateSeconds)),
                   })
                 }
               />

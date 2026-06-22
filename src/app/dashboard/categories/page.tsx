@@ -12,7 +12,8 @@ import { ImageUpload } from "@/components/ui/image-upload";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { slugify } from "@/lib/utils";
+import { slugify, storeCategoryUrl } from "@/lib/utils";
+import { storePage, STOREFRONT_PATHS } from "@/lib/storefront-links";
 import { GENDER_OPTIONS, genderLabel } from "@/lib/catalog";
 import { runSave } from "@/lib/save-action";
 import { getCategories, createCategory, updateCategory, deleteCategory } from "@/services/category.service";
@@ -68,6 +69,7 @@ export default function CategoriesPage() {
         () => updateCategory(editId, payload),
         {
           successMessage: "Category updated — image shows on storefront collections",
+          storefrontHref: storeCategoryUrl(slug),
           onSuccess: async () => {
             setCategories(await getCategories());
             setShowForm(false);
@@ -79,6 +81,7 @@ export default function CategoriesPage() {
         () => createCategory({ ...payload, active: true }),
         {
           successMessage: "Category created — add products and it appears on the site",
+          storefrontHref: storeCategoryUrl(slug),
           onSuccess: async () => {
             setCategories(await getCategories());
             setShowForm(false);
