@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, ExternalLink, ShoppingCart, Mail, Star, Globe, Package, Users } from "lucide-react";
+import { Bell, CheckCheck, ShoppingCart, Mail, Star, Globe, Package, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAdminNotifications } from "@/providers/admin-notifications-provider";
-import { cn } from "@/lib/utils";
 
 function iconFor(type: string) {
   switch (type) {
@@ -34,7 +33,7 @@ function timeAgo(ts: number) {
 }
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead } = useAdminNotifications();
+  const { notifications, unreadCount, dismiss, markAllRead } = useAdminNotifications();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -72,7 +71,7 @@ export function NotificationBell() {
             {unreadCount > 0 && (
               <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={markAllRead}>
                 <CheckCheck size={14} />
-                Mark all read
+                Clear all
               </Button>
             )}
           </div>
@@ -86,12 +85,7 @@ export function NotificationBell() {
               notifications.map((n) => {
                 const Icon = iconFor(n.type);
                 const content = (
-                  <div
-                    className={cn(
-                      "flex gap-3 px-4 py-3 transition-colors hover:bg-zinc-50",
-                      !n.read && "bg-sky-50/60"
-                    )}
-                  >
+                  <div className="flex gap-3 px-4 py-3 pr-10 transition-colors hover:bg-zinc-50 bg-sky-50/60">
                     <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600">
                       <Icon size={15} />
                     </div>
@@ -100,40 +94,55 @@ export function NotificationBell() {
                       <p className="mt-0.5 text-xs leading-relaxed text-zinc-600">{n.message}</p>
                       <p className="mt-1 text-[10px] text-zinc-400">{timeAgo(n.createdAt)}</p>
                     </div>
-                    {!n.read && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500" />}
                   </div>
+                );
+
+                const dismissButton = (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      dismiss(n.id);
+                    }}
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700"
+                    aria-label="Dismiss notification"
+                  >
+                    <X size={14} />
+                  </button>
                 );
 
                 if (n.href) {
                   return (
-                    <Link
-                      key={n.id}
-                      href={n.href}
-                      target={n.href.startsWith("http") ? "_blank" : undefined}
-                      rel={n.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                      onClick={() => {
-                        markRead(n.id);
-                        setOpen(false);
-                      }}
-                      className="block border-b border-zinc-100 last:border-0"
-                    >
-                      {content}
-                      {n.href.startsWith("http") && (
-                        <ExternalLink size={12} className="absolute right-4 top-4 text-zinc-400" />
-                      )}
-                    </Link>
+                    <div key={n.id} className="relative border-b border-zinc-100 last:border-0">
+                      <Link
+                        href={n.href}
+                        target={n.href.startsWith("http") ? "_blank" : undefined}
+                        rel={n.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                        onClick={() => {
+                          dismiss(n.id);
+                          setOpen(false);
+                        }}
+                        className="block"
+                      >
+                        {content}
+                      </Link>
+                      {dismissButton}
+                    </div>
                   );
                 }
 
                 return (
-                  <button
-                    key={n.id}
-                    type="button"
-                    className="block w-full border-b border-zinc-100 text-left last:border-0"
-                    onClick={() => markRead(n.id)}
-                  >
-                    {content}
-                  </button>
+                  <div key={n.id} className="relative border-b border-zinc-100 last:border-0">
+                    <button
+                      type="button"
+                      className="block w-full text-left"
+                      onClick={() => dismiss(n.id)}
+                    >
+                      {content}
+                    </button>
+                    {dismissButton}
+                  </div>
                 );
               })
             )}

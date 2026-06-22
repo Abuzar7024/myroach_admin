@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -22,7 +23,8 @@ import { USE_MOCK, STORE_URL } from "@/lib/config";
 import { toString, toNumber, toBool } from "@/lib/firestore-helpers";
 import { normalizeRequestType } from "@/lib/order-request";
 
-const STORAGE_KEY = "myroach-admin-notifications-read";
+const STORAGE_KEY = "myroach-admin-notifications-dismissed";
+const LEGACY_STORAGE_KEY = "myroach-admin-notifications-read";
 const DEV_BYPASS_UID = "dev-bypass-admin";
 const MAX_NOTIFICATIONS = 40;
 
@@ -41,6 +43,7 @@ interface AdminNotificationsContextValue {
   unreadCount: number;
   unreadByHref: Record<string, number>;
   markRead: (id: string) => void;
+  dismiss: (id: string) => void;
   markAllRead: () => void;
   markReadForPath: (pathname: string) => void;
   clearAll: () => void;
@@ -51,24 +54,37 @@ const AdminNotificationsContext = createContext<AdminNotificationsContextValue>(
   unreadCount: 0,
   unreadByHref: {},
   markRead: () => {},
+  dismiss: () => {},
   markAllRead: () => {},
   markReadForPath: () => {},
   clearAll: () => {},
 });
 
-function loadReadIds(): Set<string> {
+function loadDismissedIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    const ids = new Set<string>();
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      (JSON.parse(stored) as string[]).forEach((id) => ids.add(id));
+    }
+    const legacy = sessionStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      (JSON.parse(legacy) as string[]).forEach((id) => ids.add(id));
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+    if (legacy && ids.size) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    }
+    return ids;
   } catch {
     return new Set();
   }
 }
 
-function saveReadIds(ids: Set<string>) {
+function saveDismissedIds(ids: Set<string>) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
   } catch {
     /* ignore */
   }
@@ -99,9 +115,24 @@ function toastForNotification(n: AdminNotification) {
 
 export function AdminNotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds());
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => loadDismissedIds());
+  const dismissedRef = useRef(dismissedIds);
+  dismissedRef.current = dismissedIds;
+
+  const dismiss = useCallback((id: string) => {
+    setDismissedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      saveDismissedIds(next);
+      return next;
+    });
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
 
   const pushNotification = useCallback((input: Omit<AdminNotification, "read"> & { silent?: boolean }) => {
+    if (dismissedRef.current.has(input.id)) return;
+
     const item: AdminNotification = {
       id: input.id,
       type: input.type,
@@ -109,7 +140,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       message: input.message,
       href: input.href,
       createdAt: input.createdAt,
-      read: readIds.has(input.id),
+      read: false,
     };
 
     setNotifications((prev) => {
@@ -117,10 +148,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       return [item, ...prev].slice(0, MAX_NOTIFICATIONS);
     });
 
-    if (!item.read && !input.silent) {
+    if (!input.silent) {
       toastForNotification(item);
     }
-  }, [readIds]);
+  }, []);
 
   useEffect(() => {
     return subscribeAdminNotifications((input) => {
@@ -361,70 +392,69 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   }, [pushNotification]);
 
   const markRead = useCallback((id: string) => {
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      saveReadIds(next);
-      return next;
-    });
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  }, []);
+    dismiss(id);
+  }, [dismiss]);
 
   const markAllRead = useCallback(() => {
     setNotifications((prev) => {
-      const nextRead = new Set(readIds);
-      prev.forEach((n) => nextRead.add(n.id));
-      saveReadIds(nextRead);
-      setReadIds(nextRead);
-      return prev.map((n) => ({ ...n, read: true }));
+      const ids = prev.map((n) => n.id);
+      if (!ids.length) return prev;
+      setDismissedIds((old) => {
+        const next = new Set(old);
+        ids.forEach((id) => next.add(id));
+        saveDismissedIds(next);
+        return next;
+      });
+      return [];
     });
-  }, [readIds]);
+  }, []);
 
   const markReadForPath = useCallback((pathname: string) => {
     setNotifications((prev) => {
       const ids = prev
-        .filter((n) => !n.read && n.href && pathname.startsWith(navKeyFromHref(n.href)))
+        .filter((n) => n.href && pathname.startsWith(navKeyFromHref(n.href)))
         .map((n) => n.id);
       if (!ids.length) return prev;
-      setReadIds((old) => {
+      setDismissedIds((old) => {
         const next = new Set(old);
         ids.forEach((id) => next.add(id));
-        saveReadIds(next);
+        saveDismissedIds(next);
         return next;
       });
-      return prev.map((n) => (ids.includes(n.id) ? { ...n, read: true } : n));
+      return prev.filter((n) => !ids.includes(n.id));
     });
   }, []);
 
   const clearAll = useCallback(() => {
-    setNotifications([]);
-  }, []);
+    markAllRead();
+  }, [markAllRead]);
 
-  const enriched = useMemo(
-    () => notifications.map((n) => ({ ...n, read: n.read || readIds.has(n.id) })),
-    [notifications, readIds]
+  const visible = useMemo(
+    () => notifications.filter((n) => !dismissedIds.has(n.id)),
+    [notifications, dismissedIds]
   );
 
-  const unreadCount = enriched.filter((n) => !n.read).length;
+  const unreadCount = visible.length;
 
   const unreadByHref = useMemo(() => {
     const map: Record<string, number> = {};
-    enriched.forEach((n) => {
-      if (!n.read && n.href) {
+    visible.forEach((n) => {
+      if (n.href) {
         const key = navKeyFromHref(n.href);
         map[key] = (map[key] ?? 0) + 1;
       }
     });
     return map;
-  }, [enriched]);
+  }, [visible]);
 
   return (
     <AdminNotificationsContext.Provider
       value={{
-        notifications: enriched,
+        notifications: visible,
         unreadCount,
         unreadByHref,
         markRead,
+        dismiss,
         markAllRead,
         markReadForPath,
         clearAll,
