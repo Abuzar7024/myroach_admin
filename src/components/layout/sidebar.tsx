@@ -15,10 +15,8 @@ import {
   LogOut,
   Menu,
   X,
-  ExternalLink,
   BarChart3,
   Home,
-  Globe,
   Star,
   Mail,
   FileText,
@@ -26,7 +24,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { cn, STORE_URL, USE_MOCK } from "@/lib/utils";
+import { cn, USE_MOCK } from "@/lib/utils";
+import { StoreOpenLink } from "@/components/layout/store-open-link";
 import { useAuth } from "@/providers/auth-provider";
 import { useSync } from "@/providers/sync-provider";
 import { useAdminNotifications } from "@/providers/admin-notifications-provider";
@@ -135,16 +134,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <a
-          href={STORE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mx-3 mt-3 flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2.5 text-sm font-medium text-white hover:bg-zinc-800"
-        >
-          <Globe size={16} />
-          View Live Store
-          <ExternalLink size={14} className="ml-auto opacity-60" />
-        </a>
+        <StoreOpenLink variant="sidebar" />
 
         {!USE_MOCK && connected && (
           <div className="mx-3 mt-2 flex flex-wrap gap-1 px-1">

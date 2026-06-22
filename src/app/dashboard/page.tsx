@@ -12,7 +12,8 @@ import { Badge, statusBadge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate, STORE_URL } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { StoreOpenLink } from "@/components/layout/store-open-link";
 import { getDashboardStats, getAnalytics, getTopProducts } from "@/services/dashboard.service";
 import { getOrders } from "@/services/order.service";
 import { getCustomers } from "@/services/customer.service";
@@ -89,13 +90,7 @@ export default function DashboardPage() {
       <DashboardHeader
         title="Dashboard"
         description="Live store performance from Firebase"
-        actions={
-          <a href={STORE_URL} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="gap-2">
-              <ExternalLink size={16} /> View Store
-            </Button>
-          </a>
-        }
+        actions={<StoreOpenLink label="View Store" />}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

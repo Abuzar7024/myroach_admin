@@ -11,6 +11,23 @@ const SETTINGS_DOC = "settings";
 const SETTINGS_ID = "general";
 const HOMEPAGE_ID = "homepage";
 
+const emptyHomepageDefaults: HomepageContent = {
+  featuredCollectionIds: [],
+  bestSellerIds: [],
+  newArrivalIds: [],
+  promoTitle: "",
+  promoSubtitle: "",
+  showFeatured: false,
+  showFeaturedProducts: false,
+  featuredRotateSeconds: 5,
+  showBestSellers: false,
+  showNewArrivals: false,
+  showPromo: false,
+  showShopTeaser: false,
+  showBrandStory: false,
+  showNewsletter: false,
+};
+
 async function fetchSettings(): Promise<Settings> {
   initFirebase();
   const db = getFirestoreDb();
@@ -22,12 +39,11 @@ async function fetchSettings(): Promise<Settings> {
 async function fetchHomepage(): Promise<HomepageContent> {
   initFirebase();
   const db = getFirestoreDb();
-  const defaults: HomepageContent = { ...mockStore.homepage };
-  if (!db) return defaults;
+  if (!db) return { ...mockStore.homepage };
   const snap = await getDoc(doc(db, SETTINGS_DOC, HOMEPAGE_ID));
   return snap.exists()
-    ? { ...defaults, ...(snap.data() as Partial<HomepageContent>) }
-    : defaults;
+    ? { ...emptyHomepageDefaults, ...(snap.data() as Partial<HomepageContent>) }
+    : { ...emptyHomepageDefaults };
 }
 
 export async function getSettings(): Promise<Settings> {

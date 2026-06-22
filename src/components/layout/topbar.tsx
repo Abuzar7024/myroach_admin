@@ -1,9 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ExternalLink } from "lucide-react";
-import { STORE_URL } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { StoreOpenLink } from "@/components/layout/store-open-link";
 import { NotificationBell } from "@/components/layout/notification-bell";
 
 export function TopBar() {
@@ -30,12 +28,7 @@ export function TopBar() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell />
-          <a href={STORE_URL} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" size="sm" className="gap-2">
-              <ExternalLink size={14} />
-              Open Store
-            </Button>
-          </a>
+          <StoreOpenLink label="Open Store" />
         </div>
       </div>
     </header>

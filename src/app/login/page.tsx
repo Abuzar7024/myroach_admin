@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ExternalLink } from "lucide-react";
 import { login } from "@/services/auth.service";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { USE_MOCK, STORE_URL, FIREBASE_CONFIGURED } from "@/lib/utils";
+import { USE_MOCK, FIREBASE_CONFIGURED } from "@/lib/utils";
+import { StoreOpenLink } from "@/components/layout/store-open-link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -102,15 +102,7 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-        <a
-          href={STORE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
-        >
-          <ExternalLink size={14} />
-          Visit customer store
-        </a>
+        <StoreOpenLink variant="text" label="Visit customer store" className="mt-6" />
       </div>
     </div>
   );

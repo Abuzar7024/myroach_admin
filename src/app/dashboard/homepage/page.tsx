@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
 import { DashboardHeader } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
 import { FeaturedCollectionScheduler } from "@/components/homepage/featured-collection-scheduler";
-import { STORE_URL } from "@/lib/utils";
+import { StoreOpenLink } from "@/components/layout/store-open-link";
 import { runSave } from "@/lib/save-action";
 import { getHomepageContent, updateHomepageContent } from "@/services/settings.service";
 import { getProducts } from "@/services/product.service";
@@ -79,13 +78,7 @@ export default function HomepagePage() {
       <DashboardHeader
         title="Homepage Content"
         description="Control what appears on your live store homepage"
-        actions={
-          <a href={STORE_URL} target="_blank" rel="noopener noreferrer">
-            <Button variant="outline" className="gap-2">
-              <ExternalLink size={16} /> Preview Store
-            </Button>
-          </a>
-        }
+        actions={<StoreOpenLink label="Preview Store" />}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

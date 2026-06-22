@@ -55,3 +55,12 @@ export function storeProductUrl(slug: string) {
 export function storeCategoryUrl(slug: string) {
   return `${STORE_URL}/collections/${slug}`;
 }
+
+/** Hostname shown next to admin “open store” links (e.g. myroach.vercel.app). */
+export function storeUrlHost() {
+  try {
+    return new URL(STORE_URL).host;
+  } catch {
+    return STORE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  }
+}
