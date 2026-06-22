@@ -145,5 +145,10 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
       allow read: if isAdmin();
     }
+
+    match /razorpay_events/{eventId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
   }
 }

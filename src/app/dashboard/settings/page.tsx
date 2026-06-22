@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { FooterEditor } from "@/components/settings/footer-editor";
+import { RazorpayIntegrationCard } from "@/components/settings/razorpay-integration-card";
 import { mergeFooterConfig } from "@/lib/footer-config";
 import { runSave } from "@/lib/save-action";
 import { getSettings, updateSettings, getHomepageContent, updateHomepageContent } from "@/services/settings.service";
@@ -241,6 +242,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <RazorpayIntegrationCard />
 
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Homepage Sections</CardTitle></CardHeader>

@@ -22,6 +22,7 @@ import {
   FileText,
   Activity,
   RotateCcw,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { cn, USE_MOCK } from "@/lib/utils";
@@ -53,6 +54,7 @@ const navGroups = [
     label: "Sales",
     items: [
       { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
+      { href: "/dashboard/payments", label: "Razorpay", icon: CreditCard },
       { href: "/dashboard/order-requests", label: "Order Requests", icon: RotateCcw },
       { href: "/dashboard/customers", label: "Customers", icon: Users },
       { href: "/dashboard/coupons", label: "Coupons", icon: Ticket },
