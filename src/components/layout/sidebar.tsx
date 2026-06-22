@@ -23,7 +23,7 @@ import {
   Activity,
   RotateCcw,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { cn, USE_MOCK } from "@/lib/utils";
 import { StoreOpenLink } from "@/components/layout/store-open-link";
 import { useAuth } from "@/providers/auth-provider";
@@ -76,12 +76,48 @@ const navGroups = [
   },
 ];
 
+const SIDEBAR_SCROLL_KEY = "myroach-admin-sidebar-scroll";
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { connected, counts } = useSync();
   const { unreadByHref, unreadCount, markReadForPath } = useAdminNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
+
+  function saveSidebarScroll() {
+    const el = navRef.current;
+    if (!el) return;
+    try {
+      sessionStorage.setItem(SIDEBAR_SCROLL_KEY, String(el.scrollTop));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function restoreSidebarScroll() {
+    const el = navRef.current;
+    if (!el) return;
+    try {
+      const saved = sessionStorage.getItem(SIDEBAR_SCROLL_KEY);
+      if (saved != null) el.scrollTop = Number(saved);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useLayoutEffect(() => {
+    restoreSidebarScroll();
+  }, [pathname]);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const onScroll = () => saveSidebarScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     markReadForPath(pathname);
@@ -113,7 +149,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-zinc-200 bg-white shadow-sm transition-transform lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col overflow-hidden border-r border-zinc-200 bg-white shadow-sm transition-transform lg:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -142,7 +178,7 @@ export function Sidebar() {
           </div>
         )}
 
-        <nav className="flex-1 overflow-y-auto p-3">
+        <nav ref={navRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
           {navGroups.map((group) => (
             <div key={group.label} className="mb-4">
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{group.label}</p>
@@ -155,7 +191,11 @@ export function Sidebar() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setMobileOpen(false)}
+                      scroll={false}
+                      onClick={() => {
+                        saveSidebarScroll();
+                        setMobileOpen(false);
+                      }}
                       className={cn(
                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                         active
