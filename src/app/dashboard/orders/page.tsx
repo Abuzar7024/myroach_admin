@@ -187,18 +187,25 @@ export default function OrdersPage() {
                   <TD>{formatDate(o.createdAt)}</TD>
                   <TD>{formatCurrency(o.total)}</TD>
                   <TD>
-                    <Select
-                      aria-label={`Status for ${orderLabel(o)}`}
-                      value={o.status}
-                      onChange={(e) => handleStatusChange(o.id, e.target.value as OrderStatus)}
-                      className="h-8 py-0 text-xs capitalize"
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </Select>
+                    {o.status === "refunded" || o.status === "cancelled" ? (
+                      <div>
+                        <Badge variant={statusBadge(o.status)}>{o.status}</Badge>
+                        <p className="mt-1 text-[10px] text-zinc-400">Final — can&apos;t be changed</p>
+                      </div>
+                    ) : (
+                      <Select
+                        aria-label={`Status for ${orderLabel(o)}`}
+                        value={o.status}
+                        onChange={(e) => handleStatusChange(o.id, e.target.value as OrderStatus)}
+                        className="h-8 py-0 text-xs capitalize"
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
                   </TD>
                   <TD>
                     <Badge variant={statusBadge(o.paymentStatus)}>{o.paymentStatus}</Badge>

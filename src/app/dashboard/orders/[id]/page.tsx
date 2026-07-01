@@ -100,6 +100,7 @@ export default function OrderDetailPage() {
 
   const currentIdx = STATUS_FLOW.indexOf(order.status);
   const statusDirty = statusDraft !== order.status;
+  const isTerminal = order.status === "cancelled" || order.status === "refunded";
   const displayId = order.orderNumber || order.id;
 
   return (
@@ -121,26 +122,35 @@ export default function OrderDetailPage() {
           <CardTitle>Update order status</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[200px] flex-1">
-            <label className="mb-1 block text-xs font-medium text-zinc-500">Status</label>
-            <Select
-              value={statusDraft}
-              onChange={(e) => setStatusDraft(e.target.value as OrderStatus)}
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button onClick={saveStatus} disabled={!statusDirty || savingStatus}>
-            {savingStatus ? "Saving..." : "Save status"}
-          </Button>
-          {statusDirty && (
-            <p className="w-full text-xs text-zinc-500">
-              Current live status: <Badge variant={statusBadge(order.status)}>{order.status}</Badge>
+          {isTerminal ? (
+            <p className="text-sm text-zinc-500">
+              This order is <Badge variant="destructive">{order.status}</Badge> — a final state,
+              so its status can no longer be changed.
             </p>
+          ) : (
+            <>
+              <div className="min-w-[200px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-zinc-500">Status</label>
+                <Select
+                  value={statusDraft}
+                  onChange={(e) => setStatusDraft(e.target.value as OrderStatus)}
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button onClick={saveStatus} disabled={!statusDirty || savingStatus}>
+                {savingStatus ? "Saving..." : "Save status"}
+              </Button>
+              {statusDirty && (
+                <p className="w-full text-xs text-zinc-500">
+                  Current live status: <Badge variant={statusBadge(order.status)}>{order.status}</Badge>
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
