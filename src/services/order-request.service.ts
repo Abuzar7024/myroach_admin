@@ -150,22 +150,23 @@ export async function respondToOrderRequest(input: {
     amount: formatCurrency(input.orderTotal),
   });
 
-  const adminResponse: OrderRequestAdminResponse = {
+  // Build the response WITHOUT undefined fields — Firestore rejects `undefined`
+  // (e.g. when the admin adds no note, or the template has no refund days),
+  // which would throw and stop the order-status update from ever running.
+  const note = input.customNote?.trim();
+  const adminResponse: Record<string, unknown> = {
     templateKey: input.templateKey,
     message,
-    refundDays: input.refundDays,
-    customNote: input.customNote?.trim() || undefined,
-    sentAt: new Date().toISOString(),
+    sentAt: Timestamp.now(),
   };
+  if (input.refundDays != null) adminResponse.refundDays = input.refundDays;
+  if (note) adminResponse.customNote = note;
 
   await runFirestoreWrite(async () => {
     const db = getFirestoreDb()!;
     await updateDoc(doc(db, COL, input.requestId), {
       status: input.decision,
-      adminResponse: {
-        ...adminResponse,
-        sentAt: Timestamp.now(),
-      },
+      adminResponse,
       updatedAt: Timestamp.now(),
     });
 
