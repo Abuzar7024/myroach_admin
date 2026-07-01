@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+
+# Markdown files
+*.md
+
 # next.js
 /.next/
 /out/

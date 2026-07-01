@@ -25,7 +25,12 @@ service cloud.firestore {
     }
 
     function isBootstrapAdminEmail() {
-      return request.auth.token.email in ['admin@gmail.com', 'admin@myroach.in'];
+      // Hardened (audit H5): the bootstrap email must be VERIFIED, so a user
+      // cannot self-provision admin by merely registering with this email
+      // string. Remove this backdoor entirely once a real admin is provisioned
+      // via a custom claim / the Firebase console.
+      return request.auth.token.email_verified == true
+        && request.auth.token.email in ['admin@gmail.com', 'admin@myroach.in'];
     }
 
     match /users/{userId} {

@@ -1,0 +1,15 @@
+# Exclude from the production deployment bundle.
+
+# Documentation & audit output (all Markdown)
+*.md
+
+# Test-case / testing files (future-proofing — no test framework yet)
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/__tests__/**
+**/__mocks__/**
+
+# Local tooling / scratch
+.github/
