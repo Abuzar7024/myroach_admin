@@ -9,10 +9,21 @@ import { Badge, statusBadge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { subscribeOrders } from "@/services/order.service";
+import { subscribeOrders, updateOrderStatus } from "@/services/order.service";
 import { subscribeOrderRequests } from "@/services/order-request.service";
-import type { Order } from "@/types";
+import type { Order, OrderStatus } from "@/types";
 import type { OrderRequest } from "@/lib/order-request";
+import { toast } from "sonner";
+
+const STATUS_OPTIONS: OrderStatus[] = [
+  "pending",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+];
 
 function orderLabel(o: Order) {
   return o.orderNumber || o.id;
@@ -80,6 +91,17 @@ export default function OrdersPage() {
       }),
     [orders, search, statusFilter]
   );
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    // Optimistic update — the live subscription confirms/corrects it.
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+    try {
+      await updateOrderStatus(orderId, status);
+      toast.success(`Order status updated to ${status}`);
+    } catch {
+      toast.error("Couldn't update the order status. Try again.");
+    }
+  };
 
   if (loading) return <PageLoader />;
 
@@ -161,11 +183,22 @@ export default function OrdersPage() {
                       </Badge>
                     )}
                   </TD>
-                  <TD>{o.customerName || "—"}</TD>
+                  <TD>{o.customerName || o.customerEmail || "—"}</TD>
                   <TD>{formatDate(o.createdAt)}</TD>
                   <TD>{formatCurrency(o.total)}</TD>
                   <TD>
-                    <Badge variant={statusBadge(o.status)}>{o.status}</Badge>
+                    <Select
+                      aria-label={`Status for ${orderLabel(o)}`}
+                      value={o.status}
+                      onChange={(e) => handleStatusChange(o.id, e.target.value as OrderStatus)}
+                      className="h-8 py-0 text-xs capitalize"
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </Select>
                   </TD>
                   <TD>
                     <Badge variant={statusBadge(o.paymentStatus)}>{o.paymentStatus}</Badge>
