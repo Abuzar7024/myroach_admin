@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, getDoc, updateDoc, Timestamp, onSnapshot, arrayUnion } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, updateDoc, deleteDoc, Timestamp, onSnapshot, arrayUnion } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { runFirestoreWrite } from "@/lib/firestore-write";
 import { mockStore } from "@/lib/mock-data";
@@ -17,6 +17,8 @@ function mapOrderItems(raw: unknown): Order["items"] {
     quantity: toNumber(item.quantity, 1),
     price: toNumber(item.price),
     image: item.image != null ? toString(item.image) : undefined,
+    printSide:
+      item.printSide === "front" || item.printSide === "back" ? item.printSide : undefined,
   }));
 }
 
@@ -190,6 +192,17 @@ export async function updateOrderPaymentStatus(id: string, paymentStatus: Paymen
       paymentStatus,
       updatedAt: Timestamp.now(),
     });
+  });
+}
+
+export async function deleteOrder(id: string): Promise<void> {
+  if (USE_MOCK) {
+    mockStore.orders = mockStore.orders.filter((o) => o.id !== id);
+    return;
+  }
+  await runFirestoreWrite(async () => {
+    const db = getFirestoreDb()!;
+    await deleteDoc(doc(db, COL, id));
   });
 }
 

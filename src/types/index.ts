@@ -71,6 +71,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   image?: string;
+  printSide?: "front" | "back";
 }
 
 export interface ShippingAddress {

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea, Select } from "@/components/ui/input";
 import { PriceInput } from "@/components/ui/price-input";
 import { Card, CardContent } from "@/components/ui/card";
-import { MultiImageUpload } from "@/components/ui/image-upload";
+import { FrontBackImageUpload } from "@/components/ui/image-upload";
 import { SizePicker } from "@/components/ui/size-picker";
 import { PageLoader } from "@/components/ui/skeleton";
 import { slugify, storeProductUrl } from "@/lib/utils";
@@ -89,8 +89,9 @@ export default function CreateProductPage() {
       toast.error("Select a category first");
       return;
     }
-    if (images.length === 0) {
-      toast.error("Add at least one product image");
+    const finalImages = images.filter(Boolean);
+    if (finalImages.length === 0) {
+      toast.error("Add at least one product image (front or back)");
       return;
     }
     if (sizes.length === 0) {
@@ -129,7 +130,7 @@ export default function CreateProductPage() {
           categorySlug: category?.slug ?? "",
           gender: data.gender,
           tags: data.tags ? data.tags.split(",").map((t) => t.trim()) : [],
-          images,
+          images: finalImages,
           sizes,
           variants: sizes.map((value) => ({ type: "size" as const, value })),
           minOrderQty: minQty,
@@ -203,7 +204,7 @@ export default function CreateProductPage() {
                 ))}
               </Select>
             </div>
-            <MultiImageUpload values={images} onChange={setImages} storageBase="products/new" />
+            <FrontBackImageUpload values={images} onChange={setImages} storageBase="products/new" />
             <div className="space-y-2"><Label>Title</Label><Input {...register("title", { required: true })} /></div>
             <div className="space-y-2 md:col-span-2"><Label>Short Description</Label><Input {...register("shortDescription")} /></div>
             <div className="space-y-2 md:col-span-2"><Label>Description</Label><Textarea {...register("description")} /></div>

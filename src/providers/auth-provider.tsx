@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getCurrentUser, logout as authLogout } from "@/services/auth.service";
+import { clearCache } from "@/lib/local-cache";
 import type { User } from "@/types";
 
 interface AuthContextType {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await authLogout();
+    clearCache();
     setUser(null);
     router.push("/login");
   }

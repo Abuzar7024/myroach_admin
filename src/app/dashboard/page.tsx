@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, TrendingUp, ShoppingBag, Users, Package, AlertTriangle } from "lucide-react";
+import { TrendingUp, ShoppingBag, Users, Package, AlertTriangle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
 } from "recharts";
@@ -18,51 +18,50 @@ import { getDashboardStats, getAnalytics, getTopProducts } from "@/services/dash
 import { getOrders } from "@/services/order.service";
 import { getCustomers } from "@/services/customer.service";
 import { getLowStockProducts } from "@/services/product.service";
+import { useCachedResource } from "@/hooks/use-cached-resource";
 import type { AnalyticsPeriod, Order, User } from "@/types";
 
 type Stats = Awaited<ReturnType<typeof getDashboardStats>>;
 
-export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [analytics, setAnalytics] = useState<AnalyticsPeriod[]>([]);
-  const [topProducts, setTopProducts] = useState<{ title: string; sales: number; revenue: number }[]>([]);
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [recentCustomers, setRecentCustomers] = useState<User[]>([]);
-  const [lowStock, setLowStock] = useState<Awaited<ReturnType<typeof getLowStockProducts>>>([]);
-  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface DashboardBundle {
+  stats: Stats;
+  recentOrders: Order[];
+  recentCustomers: User[];
+  lowStock: Awaited<ReturnType<typeof getLowStockProducts>>;
+  topProducts: { title: string; sales: number; revenue: number }[];
+  analytics: AnalyticsPeriod[];
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const [s, orders, customers, low, top, anal] = await Promise.all([
-          getDashboardStats(),
-          getOrders(),
-          getCustomers(),
-          getLowStockProducts(),
-          getTopProducts(),
-          getAnalytics(period),
-        ]);
-        if (cancelled) return;
-        setStats(s);
-        setRecentOrders(orders.slice(0, 5));
-        setRecentCustomers(customers.slice(0, 5));
-        setLowStock(low);
-        setTopProducts(top);
-        setAnalytics(anal);
-        setError(null);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load dashboard data");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
+export default function DashboardPage() {
+  const [period, setPeriod] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+
+  const load = useCallback(async (): Promise<DashboardBundle> => {
+    const [s, orders, customers, low, top, anal] = await Promise.all([
+      getDashboardStats(),
+      getOrders(),
+      getCustomers(),
+      getLowStockProducts(),
+      getTopProducts(),
+      getAnalytics(period),
+    ]);
+    return {
+      stats: s,
+      recentOrders: orders.slice(0, 5),
+      recentCustomers: customers.slice(0, 5),
+      lowStock: low,
+      topProducts: top,
+      analytics: anal,
+    };
   }, [period]);
+
+  const { data, loading, error } = useCachedResource(`dashboard:${period}`, load);
+
+  const stats = data?.stats ?? null;
+  const analytics = data?.analytics ?? [];
+  const topProducts = data?.topProducts ?? [];
+  const recentOrders = data?.recentOrders ?? [];
+  const recentCustomers = data?.recentCustomers ?? [];
+  const lowStock = data?.lowStock ?? [];
 
   if (loading) return <PageLoader />;
   if (error) {

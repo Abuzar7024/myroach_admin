@@ -4,7 +4,10 @@ import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 export function subscribeCollection(
   db: Firestore,
   collectionName: string,
-  onData: (changes: { type: string; id: string; data: Record<string, unknown> }[]) => void,
+  onData: (
+    changes: { type: string; id: string; data: Record<string, unknown> }[],
+    meta: { fromCache: boolean }
+  ) => void,
   onError?: (error: Error) => void
 ) {
   return onSnapshot(
@@ -15,7 +18,7 @@ export function subscribeCollection(
         id: change.doc.id,
         data: change.doc.data() as Record<string, unknown>,
       }));
-      onData(changes);
+      onData(changes, { fromCache: snapshot.metadata.fromCache });
     },
     (err) => onError?.(err instanceof Error ? err : new Error(String(err)))
   );

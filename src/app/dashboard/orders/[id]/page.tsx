@@ -193,7 +193,14 @@ export default function OrderDetailPage() {
               <TBody>
                 {order.items.map((item, i) => (
                   <TR key={i}>
-                    <TD>{item.title}</TD>
+                    <TD>
+                      {item.title}
+                      {item.printSide && (
+                        <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-zinc-600">
+                          {item.printSide} print
+                        </span>
+                      )}
+                    </TD>
                     <TD>{item.quantity}</TD>
                     <TD>{formatCurrency(item.price)}</TD>
                   </TR>

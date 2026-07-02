@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea, Select } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
-import { MultiImageUpload } from "@/components/ui/image-upload";
+import { FrontBackImageUpload } from "@/components/ui/image-upload";
 import { SizePicker } from "@/components/ui/size-picker";
 import { PriceInput } from "@/components/ui/price-input";
 import { normalizePrice } from "@/lib/money";
@@ -63,7 +63,8 @@ export default function EditProductPage() {
         return;
       }
       setCategories(cats.filter((c) => c.active));
-      setImages(product.images);
+      // Keep only front/back slots (index 0 = front, 1 = back) for legacy products with extra images.
+      setImages(product.images.slice(0, 2));
       setSizes(product.sizes?.length ? product.sizes : ["M", "L", "XL"]);
       reset({
         title: product.title,
@@ -92,8 +93,9 @@ export default function EditProductPage() {
   }, [categories, postTo]);
 
   async function onSubmit(data: FormData) {
-    if (images.length === 0) {
-      toast.error("Add at least one product image");
+    const finalImages = images.filter(Boolean);
+    if (finalImages.length === 0) {
+      toast.error("Add at least one product image (front or back)");
       return;
     }
     if (sizes.length === 0) {
@@ -126,7 +128,7 @@ export default function EditProductPage() {
           categorySlug: category?.slug ?? "",
           gender: data.gender,
           tags: data.tags ? data.tags.split(",").map((t) => t.trim()) : [],
-          images,
+          images: finalImages,
           sizes,
           variants: sizes.map((value) => ({ type: "size" as const, value })),
           minOrderQty: minQty,
@@ -167,7 +169,7 @@ export default function EditProductPage() {
                 ))}
               </Select>
             </div>
-            <MultiImageUpload values={images} onChange={setImages} storageBase={`products/${id}`} />
+            <FrontBackImageUpload values={images} onChange={setImages} storageBase={`products/${id}`} />
             <div className="space-y-2"><Label>Title</Label><Input {...register("title")} /></div>
             <div className="space-y-2 md:col-span-2"><Label>Short Description</Label><Input {...register("shortDescription")} /></div>
             <div className="space-y-2 md:col-span-2"><Label>Description</Label><Textarea {...register("description")} /></div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Plus, Search, ExternalLink } from "lucide-react";
@@ -15,26 +15,16 @@ import { formatCurrency, storeProductUrl } from "@/lib/utils";
 import { runSave } from "@/lib/save-action";
 import { getProducts, deleteProduct, updateProduct } from "@/services/product.service";
 import { getCategories } from "@/services/category.service";
-import type { Product, Category } from "@/types";
+import { useCachedResource } from "@/hooks/use-cached-resource";
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const { data: productData, loading, error, refresh: refreshProducts } =
+    useCachedResource("products", getProducts);
+  const { data: categoryData } = useCachedResource("categories", getCategories);
+  const products = useMemo(() => productData ?? [], [productData]);
+  const categories = categoryData ?? [];
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.all([getProducts(), getCategories()])
-      .then(([p, c]) => {
-        setProducts(p);
-        setCategories(c);
-        setError(null);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load products"))
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -52,7 +42,9 @@ export default function ProductsPage() {
       () => deleteProduct(id),
       {
         successMessage: "Product deleted",
-        onSuccess: async () => setProducts(await getProducts()),
+        onSuccess: async () => {
+          await refreshProducts();
+        },
       }
     );
   }
@@ -62,7 +54,9 @@ export default function ProductsPage() {
       () => updateProduct(id, { active: !active }),
       {
         successMessage: "Product updated",
-        onSuccess: async () => setProducts(await getProducts()),
+        onSuccess: async () => {
+          await refreshProducts();
+        },
       }
     );
   }

@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, getDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirestoreDb, initFirebase } from "@/lib/firebase";
 import { mockStore } from "@/lib/mock-data";
 import { toDate, toString, toBool } from "@/lib/firestore-helpers";
@@ -56,4 +56,20 @@ export async function updateCustomer(uid: string, data: Partial<User>): Promise<
   const db = getFirestoreDb();
   if (!db) throw new Error("Firestore not initialized");
   await updateDoc(doc(db, COL, uid), data);
+}
+
+/**
+ * Removes the customer's Firestore profile document (users/{uid}).
+ * Note: this does not delete their Firebase Auth login — that requires a
+ * server-side Admin SDK call. It removes them from the admin customer list.
+ */
+export async function deleteCustomer(uid: string): Promise<void> {
+  if (USE_MOCK) {
+    mockStore.users = mockStore.users.filter((u) => u.uid !== uid);
+    return;
+  }
+  initFirebase();
+  const db = getFirestoreDb();
+  if (!db) throw new Error("Firestore not initialized");
+  await deleteDoc(doc(db, COL, uid));
 }

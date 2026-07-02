@@ -331,7 +331,7 @@ export function MultiImageUpload({
           </div>
           <p className="mt-1 text-xs text-zinc-500">
             {USE_FIRESTORE_IMAGES
-              ? "Free mode: compressed images saved in Firestore (max ~4 per product)"
+              ? `Free mode: compressed images saved in Firestore (max ${maxImages} per product)`
               : "File → Firebase Storage · URL saved to Firestore when you create/save the product"}
           </p>
         </div>
@@ -349,6 +349,62 @@ export function MultiImageUpload({
         }}
         onConfirm={onCropConfirm}
       />
+    </div>
+  );
+}
+
+interface FrontBackImageUploadProps {
+  label?: string;
+  /** Positional: [0] = front, [1] = back. Empty strings mark an unfilled slot. */
+  values: string[];
+  onChange: (urls: string[]) => void;
+  storageBase: string;
+  disabled?: boolean;
+}
+
+/**
+ * Two clearly-labeled cards — Front and Back — each accepting a single image.
+ * Front maps to images[0] (the storefront's primary image), Back to images[1].
+ */
+export function FrontBackImageUpload({
+  label = "Product images",
+  values,
+  onChange,
+  storageBase,
+  disabled,
+}: FrontBackImageUploadProps) {
+  const setSlot = (index: 0 | 1, url: string) => {
+    const next: string[] = [values[0] ?? "", values[1] ?? ""];
+    next[index] = url;
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-2 md:col-span-2">
+      <Label>{label}</Label>
+      <p className="text-xs text-zinc-500">
+        Add a front and a back photo (max 2). The front image is shown first on the storefront.
+      </p>
+      <div className="flex flex-wrap gap-6">
+        <div className="rounded-lg border border-zinc-200 p-3">
+          <ImageUpload
+            label="Front"
+            value={values[0] ?? ""}
+            onChange={(url) => setSlot(0, url)}
+            storageBase={`${storageBase}/front`}
+            disabled={disabled}
+          />
+        </div>
+        <div className="rounded-lg border border-zinc-200 p-3">
+          <ImageUpload
+            label="Back"
+            value={values[1] ?? ""}
+            onChange={(url) => setSlot(1, url)}
+            storageBase={`${storageBase}/back`}
+            disabled={disabled}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,9 +8,12 @@ import { Input, Select } from "@/components/ui/input";
 import { Badge, statusBadge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageLoader } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { subscribeOrders, updateOrderStatus } from "@/services/order.service";
+import { runSave } from "@/lib/save-action";
+import { subscribeOrders, updateOrderStatus, deleteOrder } from "@/services/order.service";
 import { subscribeOrderRequests } from "@/services/order-request.service";
+import { readCache, writeCache } from "@/lib/local-cache";
 import type { Order, OrderStatus } from "@/types";
 import type { OrderRequest } from "@/lib/order-request";
 import { toast } from "sonner";
@@ -30,19 +33,19 @@ function orderLabel(o: Order) {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(() => readCache<Order[]>("orders") ?? []);
   const [requests, setRequests] = useState<OrderRequest[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [loading, setLoading] = useState(true);
+  // Skip the loader when we already have cached orders to show immediately.
+  const [loading, setLoading] = useState(() => readCache<Order[]>("orders") == null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setLoadError(null);
     const unsub = subscribeOrders(
       (o) => {
         setOrders(o);
+        writeCache("orders", o);
         setLoading(false);
         setLoadError(null);
       },
@@ -91,6 +94,12 @@ export default function OrdersPage() {
       }),
     [orders, search, statusFilter]
   );
+
+  const handleDelete = async (orderId: string) => {
+    // Optimistically drop it; the live subscription confirms removal.
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    await runSave(() => deleteOrder(orderId), { successMessage: "Order deleted" });
+  };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     // Optimistic update — the live subscription confirms/corrects it.
@@ -168,6 +177,7 @@ export default function OrdersPage() {
                 <TH>Total</TH>
                 <TH>Status</TH>
                 <TH>Payment</TH>
+                <TH>Actions</TH>
               </TR>
             </THead>
             <TBody>
@@ -209,6 +219,13 @@ export default function OrdersPage() {
                   </TD>
                   <TD>
                     <Badge variant={statusBadge(o.paymentStatus)}>{o.paymentStatus}</Badge>
+                  </TD>
+                  <TD>
+                    <ConfirmDialog
+                      title="Delete order?"
+                      description={`Permanently delete order ${orderLabel(o)}? This cannot be undone.`}
+                      onConfirm={() => handleDelete(o.id)}
+                    />
                   </TD>
                 </TR>
               ))}

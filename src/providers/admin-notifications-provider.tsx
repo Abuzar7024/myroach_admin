@@ -20,11 +20,15 @@ import {
 import { getFirebaseAuth, initFirebase } from "@/lib/firebase";
 import { getRealtimeDb, subscribeCollection } from "@/lib/realtime";
 import { USE_MOCK, STORE_URL } from "@/lib/config";
-import { toString, toNumber, toBool } from "@/lib/firestore-helpers";
+import { toString, toBool } from "@/lib/firestore-helpers";
 import { normalizeRequestType } from "@/lib/order-request";
 
 const STORAGE_KEY = "myroach-admin-notifications-dismissed";
 const LEGACY_STORAGE_KEY = "myroach-admin-notifications-read";
+// IDs that have already triggered a toast — persisted so a notification
+// toasts at most once, ever (no repeat toasts on reload/re-subscribe).
+const SEEN_STORAGE_KEY = "myroach-admin-notifications-seen";
+const MAX_SEEN = 500;
 const DEV_BYPASS_UID = "dev-bypass-admin";
 const MAX_NOTIFICATIONS = 40;
 
@@ -90,6 +94,25 @@ function saveDismissedIds(ids: Set<string>) {
   }
 }
 
+function loadSeenIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const stored = localStorage.getItem(SEEN_STORAGE_KEY);
+    return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenIds(ids: Set<string>) {
+  try {
+    // Keep only the most recent IDs so this can't grow without bound.
+    localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify([...ids].slice(-MAX_SEEN)));
+  } catch {
+    /* ignore */
+  }
+}
+
 function toastForNotification(n: AdminNotification) {
   const action = n.href
     ? {
@@ -119,6 +142,12 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   const dismissedRef = useRef(dismissedIds);
   dismissedRef.current = dismissedIds;
 
+  // Persisted set of notification IDs that have already toasted.
+  const seenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    seenRef.current = loadSeenIds();
+  }, []);
+
   const dismiss = useCallback((id: string) => {
     setDismissedIds((prev) => {
       if (prev.has(id)) return prev;
@@ -132,6 +161,9 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
   const pushNotification = useCallback((input: Omit<AdminNotification, "read"> & { silent?: boolean }) => {
     if (dismissedRef.current.has(input.id)) return;
+
+    const seen = seenRef.current;
+    const alreadyToasted = seen.has(input.id);
 
     const item: AdminNotification = {
       id: input.id,
@@ -148,8 +180,13 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       return [item, ...prev].slice(0, MAX_NOTIFICATIONS);
     });
 
-    if (!input.silent) {
+    // Toast only the first time we ever see this notification.
+    if (!input.silent && !alreadyToasted) {
       toastForNotification(item);
+    }
+    if (!alreadyToasted) {
+      seen.add(input.id);
+      saveSeenIds(seen);
     }
   }, []);
 
@@ -214,10 +251,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         subscribeCollection(
           db,
           "orders",
-          (changes) => {
+          (changes, meta) => {
             if (!ready.orders) {
               changes.forEach((c) => known.orders.add(c.id));
-              ready.orders = true;
+              if (!meta.fromCache) ready.orders = true;
               return;
             }
             changes
@@ -241,10 +278,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         subscribeCollection(
           db,
           "orderRequests",
-          (changes) => {
+          (changes, meta) => {
             if (!ready.orderRequests) {
               changes.forEach((c) => known.orderRequests.add(c.id));
-              ready.orderRequests = true;
+              if (!meta.fromCache) ready.orderRequests = true;
               return;
             }
             changes
@@ -273,10 +310,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         subscribeCollection(
           db,
           "subscribers",
-          (changes) => {
+          (changes, meta) => {
             if (!ready.subscribers) {
               changes.forEach((c) => known.subscribers.add(c.id));
-              ready.subscribers = true;
+              if (!meta.fromCache) ready.subscribers = true;
               return;
             }
             changes
@@ -300,10 +337,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         subscribeCollection(
           db,
           "reviews",
-          (changes) => {
+          (changes, meta) => {
             if (!ready.reviews) {
               changes.forEach((c) => known.reviews.add(c.id));
-              ready.reviews = true;
+              if (!meta.fromCache) ready.reviews = true;
               return;
             }
             changes
@@ -329,10 +366,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
         subscribeCollection(
           db,
           "users",
-          (changes) => {
+          (changes, meta) => {
             if (!ready.customers) {
               changes.forEach((c) => known.customers.add(c.id));
-              ready.customers = true;
+              if (!meta.fromCache) ready.customers = true;
               return;
             }
             changes
@@ -359,7 +396,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       const unsubNewsletter = subscribeCollection(
         db,
         "newsletter",
-        (changes) => {
+        (changes, meta) => {
           changes
             .filter((c) => c.type === "added" && !known.subscribers.has(`nl-${c.id}`))
             .forEach((c) => {
@@ -378,7 +415,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
                 createdAt: Date.now(),
               });
             });
-          ready.subscribers = true;
+          if (!meta.fromCache) ready.subscribers = true;
         },
         onPermError("newsletter")
       );
